@@ -1,5 +1,5 @@
 // Spell: il guscio dell'app resta disponibile offline; i pensieri li tiene data.js (IndexedDB).
-const C = 'spell-v2';
+const C = 'spell-v3';
 const SHELL = ['./', 'index.html', 'icon-192.png', 'favicon-32.png'];
 self.addEventListener('install', e => { self.skipWaiting(); e.waitUntil(caches.open(C).then(c => c.addAll(SHELL)).catch(() => {})); });
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== C).map(x => caches.delete(x)))).then(() => self.clients.claim())));
