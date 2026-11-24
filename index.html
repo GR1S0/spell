@@ -256,6 +256,74 @@
 <div id="toast" role="status"></div>
 
 <script>
+/* SPELL · riparazione dei tempi dei file webm registrati dal telefono.
+   Chrome su Android a volte scrive i primi pacchetti a 0 s e poi salta a un orologio interno
+   (visto: 0,12 s → 7442 s): l'audio dura 4 secondi ma il lettore crede che finisca dopo 2 ore,
+   la barra sparisce e alla fine segna 124:07. Qui si rimettono in fila i tempi dei "cluster"
+   (i blocchi del file), scrivendo i nuovi valori negli stessi byte: il file non cambia lunghezza.
+   Funzione pura: riceve un ArrayBuffer e restituisce un Uint8Array (lo stesso se non c'è niente da sistemare). */
+function sistemaWebm(buf) {
+  const b = new Uint8Array(buf.slice ? buf.slice(0) : buf);
+  const ID_SEGMENT = 0x18538067, ID_CLUSTER = 0x1F43B675, ID_TIMECODE = 0xE7, ID_SIMPLEBLOCK = 0xA3, ID_BLOCKGROUP = 0xA0;
+  let p = 0;
+  // ID EBML: la lunghezza la dice il primo bit a 1 del primo byte (1-4 byte), il marcatore resta nel valore
+  const leggiId = () => {
+    const x = b[p]; let n = 1; while (n <= 4 && !(x & (0x80 >> (n - 1)))) n++;
+    if (n > 4 || p + n > b.length) return null;
+    let v = 0; for (let i = 0; i < n; i++) v = v * 256 + b[p + i];
+    p += n; return v;
+  };
+  // dimensione EBML (1-8 byte, marcatore tolto); tutti i bit a 1 = dimensione sconosciuta (Chrome la usa per Segment e Cluster)
+  const leggiDim = () => {
+    const x = b[p]; let n = 1; while (n <= 8 && !(x & (0x80 >> (n - 1)))) n++;
+    if (n > 8 || p + n > b.length) return null;
+    let v = x & (0xFF >> n), tutti1 = v === (0xFF >> n);
+    for (let i = 1; i < n; i++) { v = v * 256 + b[p + i]; if (b[p + i] !== 0xFF) tutti1 = false; }
+    p += n; return tutti1 ? -1 : v;
+  };
+  const clusters = []; // {pos, len, t, ultimo} pos/len = byte del valore del Timecode, ultimo = ultimo tempo relativo dei blocchi
+  let c = null;
+  while (p < b.length) {
+    const id = leggiId(); if (id === null) break;
+    const dim = leggiDim(); if (dim === null) break;
+    if (id === ID_SEGMENT) continue;                                   // si entra dentro
+    if (id === ID_CLUSTER) { c = {pos: -1, len: 0, t: 0, ultimo: 0}; clusters.push(c); continue; }
+    if (dim < 0) break;                                                // altro elemento senza dimensione: non so andare avanti
+    if (id === ID_TIMECODE && c) {
+      let v = 0; for (let i = 0; i < dim; i++) v = v * 256 + b[p + i];
+      c.pos = p; c.len = dim; c.t = v;
+    } else if ((id === ID_SIMPLEBLOCK || id === ID_BLOCKGROUP) && c) {
+      // SimpleBlock: numero di traccia (vint) e poi il tempo relativo al cluster, int16 con segno
+      let q = id === ID_SIMPLEBLOCK ? p : -1;
+      if (id === ID_BLOCKGROUP && b[p] === 0xA1) { const s = p; p++; const d2 = leggiDim(); q = d2 > 0 ? p : -1; p = s; }
+      if (q >= 0) {
+        let n = 1; while (n <= 8 && !(b[q] & (0x80 >> (n - 1)))) n++;
+        const rel = (b[q + n] << 8 | b[q + n + 1]) << 16 >> 16;
+        if (rel > c.ultimo) c.ultimo = rel;
+      }
+    }
+    p += dim;
+  }
+  if (clusters.length < 2) return b;
+  // tempo in millisecondi; un pacchetto opus dura 20 ms, un buco oltre 1 secondo è un salto dell'orologio
+  let scarto = 0, cambiato = false;
+  for (let i = 1; i < clusters.length; i++) {
+    const prima = clusters[i - 1], ora = clusters[i];
+    if (prima.pos < 0 || ora.pos < 0) continue;
+    const atteso = (prima.t - scarto) + prima.ultimo + 20;
+    const nuovo = ora.t - scarto;
+    if (nuovo - atteso > 1000 || nuovo < atteso - 1000) scarto += nuovo - atteso;
+    const fisso = ora.t - scarto;
+    if (fisso !== ora.t && fisso >= 0) {
+      let v = fisso; for (let k = ora.len - 1; k >= 0; k--) { b[ora.pos + k] = v % 256; v = Math.floor(v / 256); }
+      cambiato = true;
+    }
+  }
+  return cambiato ? b : new Uint8Array(buf);
+}
+if (typeof module !== 'undefined') module.exports = sistemaWebm;
+</script>
+<script>
 // Spell sul telefono: i pensieri stanno nel repository privato GR1S0/spell-data, letto e scritto con l'API di GitHub.
 // Il telefono scrive solo pensieri/<id>.<audio> e pensieri/<id>.json (un file nuovo per pensiero, mai riscritto).
 // Il Mac scrive testi/<id>.json (trascrizione, titolo, versione riscritta). Così telefono e Mac non si pestano i piedi.
@@ -384,10 +452,20 @@ window.SP = (() => {
   }
 
   // una registrazione appena finita: subito in IndexedDB, poi parte
+  // i webm di Chrome su Android possono avere un salto nei tempi: lo sistema sistemaWebm (webm.js); se qualcosa va storto resta l'originale
+  async function ripara(blob) {
+    try {
+      const buf = await blob.arrayBuffer();
+      if (new Uint8Array(buf, 0, 4).join() !== '26,69,223,163' || typeof sistemaWebm !== 'function') return blob; // non è un webm
+      return new Blob([sistemaWebm(buf)], {type: blob.type || 'audio/webm'});
+    } catch (e) { return blob; }
+  }
+
   async function aggiungi(blob, durata, mime, creato) {
     const d = creato ? new Date(creato) : new Date(), p = n => String(n).padStart(2, '0');
     const id = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
     const ext = /mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+    if (ext === 'webm') blob = await ripara(blob); // tempi in fila (vedi webm.js)
     await set('audio:' + id, blob);
     locali.unshift({id, creato: d.toISOString(), durata: Math.round(durata * 10) / 10, mime: mime || blob.type || 'audio/webm', ext, stato: 'coda'});
     await saveLocali(); emit();
@@ -441,6 +519,7 @@ window.SP = (() => {
       const r = await raw('pensieri/' + (m.audio || (m._audio && m._audio.nome))); if (!r.ok) return null;
       blob = await r.blob(); set('audio:' + id, blob);
     }
+    blob = await ripara(blob);
     return (urls[id] = URL.createObjectURL(blob));
   }
 
@@ -797,11 +876,16 @@ window.SP_LOCK = (() => {
   });
   const syncPlay = () => { playBtn.innerHTML = ico(player.paused ? 'play' : 'pause'); };
   player.addEventListener('play', syncPlay); player.addEventListener('pause', syncPlay);
-  player.addEventListener('ended', () => { fill.style.width = '0'; syncPlay(); });
+  // durata: quella misurata mentre registravi; quella del file solo se è credibile (i webm di Chrome spesso non la dicono)
+  const durata = () => {
+    const reg = (SP.pensieri().find(x => x.id === cur) || {}).durata || 0, file = player.duration;
+    return isFinite(file) && file > 0 && (!reg || Math.abs(file - reg) < Math.max(2, reg * 0.2)) ? file : reg;
+  };
+  player.addEventListener('ended', () => { fill.style.width = '0'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
   player.addEventListener('timeupdate', () => {
-    const dur = isFinite(player.duration) ? player.duration : (SP.pensieri().find(x => x.id === cur) || {}).durata || 0;
-    fill.style.width = dur ? Math.min(100, player.currentTime / dur * 100) + '%' : '0';
-    $('#detail [data-d=time]').textContent = mmss(player.currentTime);
+    const dur = durata(), t = Math.min(player.currentTime, dur || player.currentTime);
+    fill.style.width = dur ? Math.min(100, t / dur * 100) + '%' : '0';
+    $('#detail [data-d=time]').textContent = mmss(t);
   });
 
   /* ---------- registrare ---------- */
