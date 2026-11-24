@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Spell</title>
+<meta name="theme-color" content="#fafaf8">
+<meta name="robots" content="noindex">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon-32.png?v=1" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=1">
+
+<!--
+  Spell sul telefono: premi Registra, parla, il pensiero va nel repository privato e il Mac lo trascrive.
+  Icone nello stile Lucide (lucide.dev, licenza ISC).
+-->
+<style>
+  :root{
+    /* carta bianca e scala di grigi; un solo colore d'accento, il viola dell'icona, usato poco:
+       il simbolo, i pallini di stato, la registrazione in corso, l'avanzamento dell'audio */
+    /* scala "media" con i fondi scelti da Francesco: riga e riga scelta uguali, la scelta ha la cornice viola */
+    --canvas:#fafaf8; --card:#fff; --row:#f0f0f0; --row-on:#f0f0f0; --box:#fbfbf9;
+    --ink:#161616; --accent:#5b3bc4; --accent-soft:rgba(91,59,196,.1); --muted:#76767a; --rule:rgba(22,22,22,.07); --line:rgba(22,22,22,.09);
+    --red:#d64545;
+    /* Editorial New e Neue Montreal arrivano dal repository privato dopo lo sblocco; prima, quelli di sistema */
+    --serif:Editorial,ui-serif,"New York","Iowan Old Style","Noto Serif",Georgia,serif;
+    --sans:Montreal,-apple-system,BlinkMacSystemFont,system-ui,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--canvas);color:var(--ink);font:400 15px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+  body{min-height:100dvh;overscroll-behavior-y:none}
+  button{font:inherit;color:inherit;cursor:pointer}
+  [hidden]{display:none!important}
+  svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .cap{font-size:10px;font-weight:500;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+  .serif{font-family:var(--serif)}
+
+  /* ---------- pagina ---------- */
+  #app{max-width:560px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px calc(130px + var(--safe-b))}
+  .top{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 18px}
+  .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+  .brand svg{width:20px;height:20px;fill:var(--accent);stroke:none}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ink)}
+  .pill i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .pill.off{color:var(--muted)}
+  .pill.off i{background:var(--muted)}
+  h1{margin:0 4px 14px;font:400 34px/1.05 var(--serif);letter-spacing:-.01em}
+
+  /* il riquadro bianco della dashboard */
+  .sheet-card{background:var(--card);border-radius:22px;border:1px solid rgba(0,0,0,.12);overflow:hidden}
+  .usage{padding:18px 18px 16px}
+  .usage .h{font-size:14px;font-weight:600}
+  .bar{position:relative;height:1px;background:var(--rule);margin:10px 0 14px}
+  .bar::after{content:"";position:absolute;left:0;top:-.5px;width:100px;height:2px;background:var(--ink)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .stat{border-radius:12px;border:1px solid rgba(0,0,0,.08);background:var(--card);padding:12px 12px 10px;min-width:0}
+  .stat b{display:block;font:400 28px/1.1 var(--serif);font-variant-numeric:tabular-nums}
+  .stat b.hot{color:var(--accent)}
+  .stat span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.25}
+
+  .recent{border-top:1px solid var(--rule);padding:18px 14px 14px}
+  .recent .hd{display:flex;align-items:baseline;justify-content:space-between;margin:0 4px 12px}
+  .recent h2{margin:0;font:400 23px/1.2 var(--serif)}
+  ul#list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+
+  /* riga con swipe per eliminare */
+  .row{position:relative;border-radius:12px;overflow:hidden;touch-action:pan-y}
+  .row.sw{background:var(--red)}
+  .row .del{position:absolute;right:0;top:0;bottom:0;width:72px;display:grid;place-items:center;color:#fff;border:0;background:none}
+  .row .del svg{width:18px;height:18px}
+  .row .fg{position:relative;background:var(--row);padding:11px 13px 12px;transition:transform .22s cubic-bezier(.2,.8,.2,1),background .15s;display:flex;gap:11px}
+  .row .fg:active{background:var(--row-on);box-shadow:inset 0 0 0 1px var(--accent)}
+  .row .fg{border-radius:inherit;corner-shape:inherit}
+  .row.drag .fg{transition:none}
+  .row .ic{width:24px;display:grid;place-items:start center;padding-top:1px;color:var(--ink)}
+  .row .ic svg{width:17px;height:17px}
+  .row .tx{min-width:0;flex:1}
+  .row .t{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .d{font-size:12px;color:var(--muted);margin-top:1px;font-variant-numeric:tabular-nums}
+  .row .b{font-size:12.5px;color:var(--muted);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .row .st{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:5px}
+  .row .st i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .row .st.go i{animation:pulse 1s ease-in-out infinite}
+  .row .st.err i{background:var(--muted)}
+  @keyframes pulse{50%{opacity:.15}}
+
+  .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:34px 18px 30px}
+  .empty svg{width:30px;height:30px;fill:var(--accent);stroke:none}
+  .empty b{font:400 24px/1.2 var(--serif);margin-top:6px}
+  .empty p{margin:0;font-size:13px;color:var(--muted);max-width:270px}
+
+  /* ---------- il pulsante in basso: capsula nera come il notch ---------- */
+  #dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:14px 16px calc(16px + var(--safe-b));pointer-events:none;
+    background:linear-gradient(to top,var(--canvas) 55%,rgba(250,250,248,0))}
+  .capsule{pointer-events:auto;height:58px;border-radius:999px;background:#111;color:#fff;display:flex;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.06) inset;
+    transition:width .32s cubic-bezier(.2,.9,.25,1)}
+  #rec{width:168px;border:0;justify-content:center;gap:9px;font-size:15px;font-weight:500}
+  #rec svg{width:19px;height:19px}
+  #rec:active{transform:scale(.98)}
+  #live{width:min(340px,calc(100vw - 32px));padding:0 7px 0 20px;gap:14px}
+  .rdot{width:8px;height:8px;border-radius:50%;background:#a48cff;flex:none;animation:pulse 1.2s ease-in-out infinite}
+  .bars{display:flex;align-items:center;gap:3px;height:26px;flex:1}
+  .bars i{width:3px;border-radius:2px;background:#fff;height:4px;transition:height .08s linear;opacity:.92}
+  .clock{font-size:14px;font-variant-numeric:tabular-nums;color:rgba(255,255,255,.82);min-width:42px;text-align:right}
+  #stop{width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:#111;display:grid;place-items:center;flex:none}
+  #stop svg{width:14px;height:14px;fill:currentColor;stroke:none}
+  .x{width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.12);color:#fff;display:grid;place-items:center;flex:none}
+  .x svg{width:16px;height:16px}
+
+  /* ---------- un pensiero aperto ---------- */
+  #detail{position:fixed;inset:0;z-index:20;background:var(--canvas);overflow:auto;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.85,.25,1);visibility:hidden}
+  #detail.on{transform:none;visibility:visible}
+  #detail .in{max-width:560px;margin:0 auto;padding:max(14px,env(safe-area-inset-top)) 16px calc(40px + var(--safe-b))}
+  .bk{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .ghost{border:0;background:none;display:inline-flex;align-items:center;gap:4px;padding:8px 6px;border-radius:10px;font-size:15px}
+  .ghost:active{background:rgba(0,0,0,.06)}
+  .ghost.red{color:var(--red)}
+  .dcard{background:var(--card);border-radius:22px;border:1px solid rgba(0,0,0,.12);padding:20px 18px 18px}
+  .dcard h3{margin:0;font:400 30px/1.1 var(--serif);letter-spacing:-.01em;word-break:break-word}
+  .dcard .when{font-size:12px;color:var(--muted);margin-top:6px}
+  .seg{display:inline-flex;background:var(--row);border-radius:9px;padding:2px;margin:16px 0 0}
+  .seg button{border:0;background:none;font-size:13px;font-weight:500;padding:6px 12px;border-radius:7px;color:var(--muted)}
+  .seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .text{margin-top:14px;background:var(--box);border-radius:14px;padding:14px;font-size:16px;line-height:1.55;white-space:pre-wrap;word-break:break-word;min-height:120px;user-select:text}
+  .text.wait{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:10px}
+  .player{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+  .play{width:38px;height:38px;border-radius:50%;border:0;background:var(--ink);color:#fff;display:grid;place-items:center;flex:none}
+  .play svg{width:15px;height:15px;fill:currentColor;stroke:none}
+  .track{flex:1;height:3px;border-radius:2px;background:var(--rule);position:relative;overflow:hidden}
+  .track i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent)}
+  .player span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+  .sb{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:12px;font-weight:500;color:#fff;background:var(--accent);padding:6px 9px;border-radius:4px}
+
+  /* ---------- conferma ---------- */
+  #ask{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.28);display:grid;place-items:center;padding:20px;animation:fade .15s}
+  @keyframes fade{from{opacity:0}}
+  #ask .m{background:var(--card);border-radius:18px;padding:24px 22px 18px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+  #ask h4{margin:0;font:400 25px/1.15 var(--serif)}
+  #ask p{margin:10px 0 20px;font-size:14px;color:var(--muted)}
+  #ask .bt{display:flex;justify-content:flex-end;gap:8px}
+  .btn{border:1px solid rgba(0,0,0,.12);background:var(--card);border-radius:7px;padding:9px 14px;font-size:13px;font-weight:500}
+  .btn.dark{background:#000;border-color:#000;color:#fff}
+  .btn.danger{background:var(--red);border-color:var(--red);color:#fff}
+
+  #toast{position:fixed;left:50%;bottom:calc(94px + var(--safe-b));transform:translate(-50%,10px);opacity:0;z-index:50;pointer-events:none;
+    background:#111;color:#fff;font-size:13px;font-weight:500;padding:9px 14px;border-radius:999px;transition:.2s;max-width:calc(100vw - 40px);text-align:center}
+  #toast.on{opacity:1;transform:translate(-50%,0)}
+
+  /* schermate di servizio */
+  .setup,.fatal{max-width:380px;margin:12vh auto 0;padding:24px;display:flex;flex-direction:column;gap:12px}
+  .setup h1,.fatal h1{margin:0 0 4px}
+  .setup label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted)}
+  .setup input{font:inherit;font-size:15px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--ink)}
+  .setup .big,.fatal .big{border:0;background:var(--ink);color:#fff;border-radius:12px;padding:14px;font-weight:500}
+  .muted{color:var(--muted);font-size:13px;margin:0}
+
+  /* angoli squircle ovunque (non su cerchi e capsule), curva continua come su Mac */
+  @supports (corner-shape: squircle) {
+    .sheet-card{corner-shape:squircle;border-radius:35px}
+    .stat{corner-shape:squircle;border-radius:19px}
+    .row{corner-shape:squircle;border-radius:19px}
+    .ghost{corner-shape:squircle;border-radius:16px}
+    .dcard{corner-shape:squircle;border-radius:35px}
+    .seg{corner-shape:squircle;border-radius:14px}
+    .seg button{corner-shape:squircle;border-radius:11px}
+    .text{corner-shape:squircle;border-radius:22px}
+    .player{corner-shape:squircle;border-radius:19px}
+    .sb{corner-shape:squircle;border-radius:6px}
+    #ask .m{corner-shape:squircle;border-radius:29px}
+    .btn{corner-shape:squircle;border-radius:11px}
+    .setup input{corner-shape:squircle;border-radius:19px}
+    .setup .big,.fatal .big{corner-shape:squircle;border-radius:19px}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-spell" viewBox="0 0 24 24"><path d="M14.45 21.98Q13.77 22.66 12.87 22.89Q11.98 23.12 11.08 22.88Q10.18 22.65 9.50 21.97Q8.82 21.29 8.60 20.40Q8.38 19.52 8.62 18.63Q8.85 17.74 9.53 17.06L17.06 9.53Q17.74 8.85 18.63 8.62Q19.52 8.38 20.40 8.60Q21.29 8.82 21.97 9.50Q22.65 10.18 22.88 11.08Q23.12 11.98 22.89 12.87Q22.66 13.77 21.98 14.45Q21.30 15.13 20.40 15.36Q19.51 15.58 18.61 15.35Q17.71 15.12 17.03 14.44L9.55 6.96Q8.87 6.28 8.65 5.39Q8.42 4.49 8.64 3.59Q8.86 2.70 9.54 2.02Q10.23 1.34 11.13 1.11Q12.02 0.89 12.92 1.12Q13.81 1.34 14.49 2.03Q15.18 2.71 15.40 3.60Q15.62 4.49 15.39 5.37Q15.15 6.26 14.47 6.94L8.75 12.66Q8.48 12.93 8.10 12.93Q7.71 12.93 7.44 12.66Q7.17 12.39 7.17 12.01Q7.18 11.63 7.45 11.36L13.15 5.66Q13.62 5.18 13.63 4.51Q13.63 3.83 13.16 3.36Q12.69 2.89 12.02 2.89Q11.35 2.89 10.88 3.36Q10.42 3.82 10.43 4.50Q10.43 5.17 10.91 5.65L18.35 13.09Q18.83 13.57 19.50 13.57Q20.17 13.57 20.63 13.11Q21.10 12.64 21.10 11.98Q21.11 11.31 20.63 10.84Q20.16 10.36 19.49 10.37Q18.81 10.37 18.34 10.85L10.85 18.34Q10.37 18.81 10.37 19.49Q10.36 20.16 10.84 20.63Q11.31 21.11 11.98 21.10Q12.65 21.10 13.11 20.63Q13.57 20.17 13.58 19.50Q13.58 18.82 13.10 18.34L5.65 10.90Q5.18 10.42 4.50 10.42Q3.82 10.42 3.36 10.88Q2.90 11.35 2.90 12.02Q2.89 12.69 3.36 13.16Q3.83 13.63 4.51 13.63Q5.18 13.62 5.66 13.15L7.45 11.36Q7.72 11.09 8.09 11.09Q8.47 11.09 8.74 11.36Q9.01 11.63 9.02 12.01Q9.02 12.39 8.75 12.66L6.94 14.47Q6.26 15.15 5.37 15.39Q4.49 15.62 3.60 15.40Q2.71 15.18 2.02 14.49Q1.34 13.81 1.12 12.92Q0.89 12.02 1.11 11.12Q1.34 10.23 2.02 9.54Q2.70 8.86 3.60 8.64Q4.49 8.41 5.39 8.64Q6.28 8.87 6.96 9.55L14.44 17.03Q15.12 17.71 15.36 18.61Q15.59 19.50 15.36 20.40Q15.14 21.29 14.45 21.98Z"/></symbol>
+  <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55A1 1 0 0 1 20.38 20H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
+  <symbol id="i-text" viewBox="0 0 24 24"><path d="M17 6.1H3M21 12.1H3M15.1 18H3"/></symbol>
+  <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2.5"/></symbol>
+</svg>
+
+<div id="app" hidden>
+  <header class="top">
+    <div class="brand"><svg class="i"><use href="#i-spell"/></svg>Spell</div>
+    <span class="pill" id="net"><i></i><span>Trascrive il tuo Mac</span></span>
+  </header>
+  <h1>Pensieri</h1>
+
+  <section class="sheet-card">
+    <div class="usage">
+      <div class="h">I tuoi pensieri</div>
+      <div class="bar"></div>
+      <div class="stats">
+        <div class="stat"><b data-s="n">0</b><span>registrati</span></div>
+        <div class="stat"><b data-s="min">0:00</b><span>di voce</span></div>
+        <div class="stat"><b data-s="att">0</b><span>da trascrivere</span></div>
+      </div>
+    </div>
+    <div class="recent">
+      <div class="hd"><h2>Ultimi pensieri</h2><span class="cap">dal telefono</span></div>
+      <ul id="list"></ul>
+      <div class="empty" id="empty" hidden>
+        <svg class="i"><use href="#i-spell"/></svg>
+        <b>Le tue idee, in un posto solo.</b>
+        <p>Premi Registra e parla. Il Mac trascrive ogni pensiero e te lo rimanda qui.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="dock" hidden>
+  <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
+  <div id="live" class="capsule" hidden>
+    <button class="x" id="annulla" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
+    <span class="rdot"></span>
+    <div class="bars" id="bars"></div>
+    <span class="clock" id="clock">0:00</span>
+    <button id="stop" type="button" aria-label="Fine"><svg class="i"><use href="#i-stop"/></svg></button>
+  </div>
+</div>
+
+<div id="detail" aria-hidden="true"><div class="in">
+  <div class="bk">
+    <button class="ghost" type="button" data-a="back"><svg class="i"><use href="#i-back"/></svg>Pensieri</button>
+    <button class="ghost red" type="button" data-a="del"><svg class="i"><use href="#i-trash"/></svg></button>
+  </div>
+  <div class="dcard">
+    <h3 data-d="title"></h3>
+    <div class="when" data-d="when"></div>
+    <div class="seg" data-d="seg" hidden><button type="button" data-t="0" class="on">Trascrizione</button><button type="button" data-t="1">Riscritta</button></div>
+    <div class="text" data-d="text"></div>
+    <div class="player">
+      <button class="play" type="button" data-a="play"><svg class="i"><use href="#i-play"/></svg></button>
+      <div class="track"><i></i></div>
+      <span data-d="time">0:00</span>
+    </div>
+    <div data-d="sb" hidden><span class="sb"><svg class="i" style="width:14px;height:14px"><use href="#i-brain"/></svg>Nel Second Brain</span></div>
+  </div>
+</div></div>
+
+<div id="toast" role="status"></div>
+
+<script>
+// Spell sul telefono: i pensieri stanno nel repository privato GR1S0/spell-data, letto e scritto con l'API di GitHub.
+// Il telefono scrive solo pensieri/<id>.<audio> e pensieri/<id>.json (un file nuovo per pensiero, mai riscritto).
+// Il Mac scrive testi/<id>.json (trascrizione, titolo, versione riscritta). Così telefono e Mac non si pestano i piedi.
+// Ogni registrazione resta prima in IndexedDB: se manca la rete parte appena torna.
+window.SP = (() => {
+  const CFG_KEY = 'sp-gh';
+  let cfg = null;
+  const api = () => (cfg && cfg.api) || 'https://api.github.com'; // cfg.api solo per le prove in locale
+
+  /* ---------- IndexedDB minimo ---------- */
+  let dbp = null;
+  const idbOpen = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('spell', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv');
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  }));
+  const idb = (mode, fn) => idbOpen().then(db => new Promise((res, rej) => {
+    const t = db.transaction('kv', mode); const req = fn(t.objectStore('kv'));
+    t.oncomplete = () => res(req && req.result); t.onerror = () => rej(t.error);
+  }));
+  const get = k => idb('readonly', s => s.get(k)).catch(() => undefined);
+  const set = (k, v) => idb('readwrite', s => s.put(v, k)).catch(() => {});
+  const del = k => idb('readwrite', s => s.delete(k)).catch(() => {});
+
+  /* ---------- GitHub ---------- */
+  const fail = (code, status) => Object.assign(new Error(code), {code, status});
+  const b64json = obj => { const b = new TextEncoder().encode(JSON.stringify(obj, null, 1)); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+  const b64blob = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(r.error); r.readAsDataURL(blob); });
+  async function gh(path, opt = {}) {
+    let r;
+    try {
+      r = await fetch(`${api()}/repos/${cfg.repo}/${path}`, Object.assign({cache: 'no-store'}, opt, {headers: Object.assign({
+        Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'}, opt.headers || {})}));
+    } catch (e) { throw fail('offline'); }
+    if (r.status === 401 || r.status === 403) throw fail('auth', r.status);
+    return r;
+  }
+  const raw = path => gh('contents/' + path, {headers: {Accept: 'application/vnd.github.raw'}});
+  async function rawJson(path) {
+    const r = await raw(path);
+    if (r.status === 404) return null;
+    if (!r.ok) throw fail('net', r.status);
+    return r.json();
+  }
+  // tutto il repository in una chiamata (l'elenco di una cartella si ferma a 1000 file, l'albero no):
+  // {pensieri: {nome: sha}, testi: {nome: sha}}
+  async function albero() {
+    const r = await gh('git/trees/HEAD?recursive=1');
+    const out = {pensieri: {}, testi: {}};
+    if (r.status === 404 || r.status === 409) return out; // repository ancora vuoto
+    if (!r.ok) throw fail('net', r.status);
+    for (const f of (await r.json()).tree || []) {
+      const m = f.type === 'blob' && /^(pensieri|testi)\/([^/]+)$/.exec(f.path);
+      if (m) out[m[1]][m[2]] = f.sha;
+    }
+    return out;
+  }
+  // file nuovo: se c'è già (un invio precedente interrotto a metà) va bene così
+  async function create(path, content, message) {
+    const r = await gh('contents/' + path, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message, content})});
+    if (r.status === 422) return null;
+    if (!r.ok) throw fail('net', r.status);
+    return (await r.json()).content.sha;
+  }
+  async function remove(path, sha, message) {
+    const r = await gh('contents/' + path, {method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message, sha})});
+    if (r.status === 404) return;
+    if (!r.ok) throw fail('net', r.status);
+  }
+
+  /* ---------- stato ---------- */
+  // remoti: id -> meta del telefono (+ _sha, _audio: {nome, sha}); testi: id -> quello che scrive il Mac (+ _sha)
+  let st = {remoti: {}, testi: {}, pulled: 0};
+  let locali = []; // registrazioni non ancora su GitHub: {id, creato, durata, mime, ext, stato: 'coda'|'invio'}
+  const listeners = new Set();
+  const emit = () => listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+  const saveLocali = () => set('locali', locali.map(l => Object.assign({}, l, {stato: 'coda'})));
+
+  async function pull() {
+    const {pensieri: pens, testi: tes} = await albero();
+    const remoti = {}, testi = {};
+    for (const [nome, sha] of Object.entries(pens)) {
+      if (!nome.endsWith('.json')) continue;
+      const id = nome.slice(0, -5), old = st.remoti[id];
+      remoti[id] = old && old._sha === sha ? old : Object.assign(await rawJson('pensieri/' + nome) || {id}, {_sha: sha});
+    }
+    for (const [nome, sha] of Object.entries(pens)) {
+      const id = nome.replace(/\.[^.]+$/, '');
+      if (!nome.endsWith('.json') && remoti[id]) remoti[id]._audio = {nome, sha};
+    }
+    for (const [nome, sha] of Object.entries(tes)) {
+      if (!nome.endsWith('.json')) continue;
+      const id = nome.slice(0, -5), old = st.testi[id];
+      testi[id] = old && old._sha === sha ? old : Object.assign(await rawJson('testi/' + nome) || {}, {_sha: sha});
+    }
+    st = {remoti, testi, pulled: Date.now()};
+    await set('st', st);
+    emit();
+  }
+
+  /* ---------- invio ---------- */
+  let flushing = false;
+  async function flush() {
+    if (flushing || !cfg) return;
+    flushing = true;
+    try {
+      for (const l of locali.slice()) {
+        const blob = await get('audio:' + l.id);
+        if (!blob) { locali = locali.filter(x => x !== l); await saveLocali(); continue; }
+        l.stato = 'invio'; emit();
+        const meta = {id: l.id, creato: l.creato, durata: l.durata, mime: l.mime, audio: `${l.id}.${l.ext}`, da: 'telefono'};
+        try {
+          // prima l'audio, poi la scheda: il Mac considera un pensiero solo quando c'è la scheda
+          await create(`pensieri/${meta.audio}`, await b64blob(blob), `pensiero: audio ${l.id}`);
+          await create(`pensieri/${l.id}.json`, b64json(meta), `pensiero: ${l.id}`);
+          locali = locali.filter(x => x !== l); await saveLocali();
+          st.remoti[l.id] = Object.assign(meta, {_sha: 'locale'}); await set('st', st);
+          emit();
+        } catch (e) {
+          l.stato = 'coda'; emit();
+          if (e.code === 'auth') { fatal(e); return; }
+          return; // offline o GitHub non risponde: riprovo al prossimo giro
+        }
+      }
+    } finally { flushing = false; }
+  }
+
+  // una registrazione appena finita: subito in IndexedDB, poi parte
+  async function aggiungi(blob, durata, mime, creato) {
+    const d = creato ? new Date(creato) : new Date(), p = n => String(n).padStart(2, '0');
+    const id = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
+    const ext = /mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+    await set('audio:' + id, blob);
+    locali.unshift({id, creato: d.toISOString(), durata: Math.round(durata * 10) / 10, mime: mime || blob.type || 'audio/webm', ext, stato: 'coda'});
+    await saveLocali(); emit();
+    flush();
+    return id;
+  }
+
+  /* ---------- la registrazione in corso, salvata ogni secondo ---------- */
+  // se il telefono chiude l'app o si spegne mentre parli, alla riapertura il pensiero non è perso
+  const bozza = (info, chunks) => set('bozza', {info, chunks});
+  const bozzaVia = () => del('bozza');
+  async function recuperaBozza() {
+    const b = await get('bozza');
+    if (!b || !b.chunks || !b.chunks.length) return false;
+    await bozzaVia();
+    const blob = new Blob(b.chunks, {type: b.info.mime || b.chunks[0].type || 'audio/webm'});
+    if (b.info.durata < 1) return false;
+    await aggiungi(blob, b.info.durata, blob.type, b.info.creato);
+    return true;
+  }
+
+  /* ---------- eliminare ---------- */
+  async function elimina(id) {
+    const loc = locali.find(l => l.id === id);
+    if (loc) {
+      if (loc.stato === 'invio') throw fail('busy');
+      locali = locali.filter(l => l !== loc); await saveLocali();
+    } else {
+      const m = st.remoti[id];
+      if (m) {
+        // chiedo la lista aggiornata, così ho gli sha veri anche di quello che ho appena inviato
+        const {pensieri: pens, testi: tes} = await albero();
+        if (tes[id + '.json']) await remove(`testi/${id}.json`, tes[id + '.json'], `elimina testo ${id}`);
+        for (const [nome, sha] of Object.entries(pens)) if (nome.replace(/\.[^.]+$/, '') === id && !nome.endsWith('.json')) await remove(`pensieri/${nome}`, sha, `elimina audio ${id}`);
+        if (pens[id + '.json']) await remove(`pensieri/${id}.json`, pens[id + '.json'], `elimina ${id}`);
+        delete st.remoti[id]; delete st.testi[id]; await set('st', st);
+      }
+    }
+    await del('audio:' + id);
+    if (urls[id]) { URL.revokeObjectURL(urls[id]); delete urls[id]; }
+    emit();
+  }
+
+  /* ---------- l'audio, per riascoltare ---------- */
+  const urls = {};
+  async function audio(id) {
+    if (urls[id]) return urls[id];
+    let blob = await get('audio:' + id);
+    if (!blob) {
+      const m = st.remoti[id]; if (!m) return null;
+      const r = await raw('pensieri/' + (m.audio || (m._audio && m._audio.nome))); if (!r.ok) return null;
+      blob = await r.blob(); set('audio:' + id, blob);
+    }
+    return (urls[id] = URL.createObjectURL(blob));
+  }
+
+  /* ---------- font: nel repository privato (fonts/fonts.json + file), mai nella pagina pubblica ---------- */
+  async function loadFonts() {
+    let faces = await get('fonts');
+    if (!faces) {
+      const r = await raw('fonts/fonts.json'); if (!r.ok) return;
+      const elenco = await r.json(); faces = [];
+      for (const f of elenco) {
+        const b = await raw('fonts/' + f.file);
+        if (b.ok) faces.push(Object.assign({}, f, {buf: await b.arrayBuffer()}));
+      }
+      set('fonts', faces);
+    }
+    for (const f of faces) { const ff = new FontFace(f.family, f.buf, {weight: f.weight || '400', style: f.style || 'normal', display: 'swap'}); await ff.load(); document.fonts.add(ff); }
+  }
+
+  /* ---------- la lista che vede l'app ---------- */
+  function pensieri() {
+    const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato}));
+    for (const [id, m] of Object.entries(st.remoti)) {
+      if (locali.some(l => l.id === id)) continue;
+      const t = st.testi[id];
+      out.push(Object.assign({id, creato: m.creato, durata: m.durata, stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
+        testo: t.testo, titolo: t.titolo, riscritto: t.riscritto, errore: t.errore, secondBrain: t.secondBrain} : {}));
+    }
+    return out.sort((a, b) => (b.creato || '').localeCompare(a.creato || ''));
+  }
+
+  /* ---------- avvio ---------- */
+  let fatalFn = () => {};
+  const fatal = e => fatalFn(e);
+  async function start(onFatal) {
+    fatalFn = onFatal || fatalFn;
+    try { cfg = JSON.parse(localStorage.getItem(CFG_KEY)) || null; } catch (e) { cfg = null; }
+    if (!cfg) cfg = await window.SP_LOCK(); // schermata del codice (lock.js)
+    if (!cfg) return false;
+    const saved = await get('st'); if (saved) st = Object.assign(st, saved);
+    locali = (await get('locali')) || [];
+    loadFonts().catch(() => {});
+    const recuperato = await recuperaBozza().catch(() => false);
+    emit();
+    const again = () => { if (document.visibilityState === 'visible') pull().then(flush).catch(e => { if (e.code === 'auth') fatal(e); }); };
+    try { await pull(); } catch (e) { if (e.code === 'auth') fatal(e); }
+    flush();
+    document.addEventListener('visibilitychange', again);
+    addEventListener('online', again);
+    setInterval(again, 30000);
+    setInterval(flush, 5000);
+    return recuperato ? 'recuperato' : true;
+  }
+  function forget() { localStorage.removeItem(CFG_KEY); }
+
+  return {CFG_KEY, start, pull, flush, aggiungi, elimina, audio, pensieri, forget, bozza, bozzaVia, on: f => (listeners.add(f), () => listeners.delete(f)),
+    get offline() { return !navigator.onLine; }};
+})();
+</script>
+<script>
+// Accesso con codice di 8 cifre, come WiseMan, BodyTemple e SideQuest: accesso.json (scritto da web/cifra.mjs) contiene
+// repository e chiave GitHub cifrati (AES-GCM); la chiave che li apre è cifrata col codice (PBKDF2, 600 000 giri).
+// Dopo il primo sblocco il dispositivo sceglie: impronta / Face ID, senza codice, o il codice ogni volta.
+window.SP_LOCK = (() => {
+  async function lockScreen() {
+    let lock = null;
+    try { const r = await fetch('accesso.json', {cache: 'no-store'}); if (r.ok) lock = await r.json(); } catch (e) {}
+    if (!lock) return null; // nessun codice impostato: resta la schermata per incollare la chiave (prove in locale)
+    const n = lock.length || 8;
+    const enc = new TextEncoder(), PRF_INPUT = enc.encode('Spell sblocco v1');
+    const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+    const b64 = u => btoa(String.fromCharCode(...new Uint8Array(u)));
+    const rand = k => crypto.getRandomValues(new Uint8Array(k));
+    const aes = (raw, use) => crypto.subtle.importKey('raw', raw, 'AES-GCM', false, use);
+    const ls = {get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } },
+                set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+                del(k) { try { localStorage.removeItem(k); } catch (e) {} }};
+
+    const el = document.createElement('div');
+    el.id = 'sp-lock';
+    el.innerHTML = `<style>
+      #sp-lock{position:fixed;inset:0;z-index:9999;overflow:auto;background:var(--canvas);color:var(--ink);display:grid;place-items:center;font:400 16px/1.45 var(--sans);
+        padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+      #sp-lock main{width:100%;max-width:340px;display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center}
+      #sp-lock img{width:96px;height:96px;border-radius:22px;box-shadow:0 1px 0 rgba(0,0,0,.05),0 12px 30px rgba(0,0,0,.08)}
+      #sp-lock h1{margin:0;font:500 34px/1.1 var(--serif)}
+      #sp-lock p{margin:0;color:var(--muted);font-size:15px}
+      #sp-lock .err{color:var(--red);min-height:1.45em}
+      #sp-lock form,#sp-lock .box{width:100%;display:flex;flex-direction:column;gap:10px}
+      #sp-lock input{width:100%;font:inherit;font-size:24px;letter-spacing:.3em;text-align:center;padding:14px 12px;border-radius:14px;border:1px solid var(--rule);background:#fff;color:var(--ink)}
+      #sp-lock input:focus{outline:2px solid var(--ink);outline-offset:1px}
+      #sp-lock button{font:inherit;font-size:15px;font-weight:500;border-radius:12px;padding:14px 18px;cursor:pointer;border:1px solid rgba(0,0,0,.12);background:#fff;color:var(--ink)}
+      #sp-lock button.go{background:var(--ink);border-color:var(--ink);color:#fff}
+      #sp-lock button:disabled{opacity:.5;cursor:default}
+      #sp-lock button.link{background:none;border:0;color:var(--muted);font-weight:400;padding:6px}
+      #sp-lock [hidden]{display:none!important}
+    </style>
+    <main>
+      <img src="icon-192.png" alt="">
+      <h1>Spell</h1>
+      <div class="box" data-v="bio" hidden>
+        <button class="go" type="button" data-a="bio">Sblocca con l'impronta</button>
+        <button class="link" type="button" data-a="use-code">Usa il codice</button>
+      </div>
+      <form data-v="code" autocomplete="off" hidden>
+        <p>Inserisci il codice per aprire i tuoi pensieri.</p>
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="${n}" autocomplete="off" aria-label="Codice a ${n} cifre">
+        <button class="go" type="submit">Sblocca</button>
+      </form>
+      <div class="box" data-v="offer" hidden>
+        <p data-e="offer">Come vuoi aprire Spell la prossima volta, su questo dispositivo?</p>
+        <button class="go" type="button" data-a="bio-on">Con l'impronta</button>
+        <button type="button" data-a="remember">Senza codice</button>
+        <button class="link" type="button" data-a="always">Chiedi sempre il codice</button>
+      </div>
+      <p class="err" role="alert" data-e="err"></p>
+    </main>`;
+    document.body.appendChild(el);
+    const $ = q => el.querySelector(q), input = $('input'), go = $('form [type=submit]');
+    const show = v => { el.querySelectorAll('[data-v]').forEach(x => { x.hidden = x.dataset.v !== v; }); if (v === 'code') setTimeout(() => input.focus(), 50); };
+    const err = t => { $('[data-e=err]').textContent = t || ''; };
+
+    const configFrom = async k => JSON.parse(new TextDecoder().decode(
+      await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(lock.payload.iv)}, await aes(k, ['decrypt']), unb64(lock.payload.ct))));
+    async function keyFromCode(code) {
+      const p = lock.pin;
+      const base = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveKey']);
+      const kek = await crypto.subtle.deriveKey({name: 'PBKDF2', salt: unb64(p.salt), iterations: p.iter, hash: 'SHA-256'}, base, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+      return new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(p.iv)}, kek, unb64(p.ct)));
+    }
+    // impronta: la passkey con l'estensione PRF dà un segreto che esiste solo dopo il riconoscimento, e cifra la chiave qui sul dispositivo
+    async function prfFrom(id) {
+      const a = await navigator.credentials.get({publicKey: {challenge: rand(32), rpId: location.hostname, userVerification: 'required',
+        allowCredentials: [{type: 'public-key', id: unb64(id)}], extensions: {prf: {eval: {first: PRF_INPUT}}}}});
+      const out = a.getClientExtensionResults().prf?.results?.first;
+      if (!out) throw new Error('noprf');
+      return out;
+    }
+    async function bioCreate() {
+      const c = await navigator.credentials.create({publicKey: {
+        rp: {name: 'Spell', id: location.hostname}, user: {id: rand(16), name: 'Spell', displayName: 'Spell'}, challenge: rand(32),
+        pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}],
+        authenticatorSelection: {authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required'},
+        extensions: {prf: {eval: {first: PRF_INPUT}}}}});
+      const prf = c.getClientExtensionResults().prf;
+      if (!prf || prf.enabled === false) throw new Error('noprf');
+      return {id: b64(c.rawId), out: prf.results?.first || null};
+    }
+    async function bioStore(id, out, k) {
+      const iv = rand(12), ct = await crypto.subtle.encrypt({name: 'AES-GCM', iv}, await aes(new Uint8Array(out).slice(0, 32), ['encrypt']), k);
+      ls.set('sp-bio', {id, iv: b64(iv), ct: b64(ct)}); ls.del('sp-bio-wait');
+    }
+    async function bioKey() {
+      const bio = ls.get('sp-bio'), out = await prfFrom(bio.id);
+      return new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: unb64(bio.iv)}, await aes(new Uint8Array(out).slice(0, 32), ['decrypt']), unb64(bio.ct)));
+    }
+
+    return new Promise(resolve => {
+      const done = async k => { const c = await configFrom(k); el.remove(); resolve(c); };
+      let pending = null;
+      $('form').addEventListener('submit', async e => {
+        e.preventDefault(); err();
+        const code = input.value.trim();
+        if (!code || go.disabled) return;
+        go.disabled = true; go.textContent = 'Controllo…';
+        let k;
+        try { k = await keyFromCode(code); }
+        catch (x) { go.disabled = false; go.textContent = 'Sblocca'; input.value = ''; input.focus(); return err('Codice sbagliato.'); }
+        if (ls.get('sp-bio') || ls.get('sp-ask')) return done(k);
+        pending = k;
+        if (!window.PublicKeyCredential) $('[data-a=bio-on]').hidden = true;
+        show('offer');
+      });
+      // alla cifra finale parte da solo
+      input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, '').slice(0, n); if (input.value.length === n) $('form').requestSubmit(); });
+      $('[data-a=bio-on]').addEventListener('click', async () => {
+        err();
+        try {
+          const wait = ls.get('sp-bio-wait');
+          // su iPhone la creazione e la lettura della passkey possono chiedere due tocchi separati
+          const c = wait ? {id: wait, out: null} : await bioCreate();
+          const out = c.out || await prfFrom(c.id).catch(x => { ls.set('sp-bio-wait', c.id); throw x; });
+          await bioStore(c.id, out, pending);
+          done(pending);
+        } catch (x) {
+          if (x.message === 'noprf') {
+            ls.del('sp-bio-wait');
+            $('[data-e=offer]').textContent = 'L\'impronta qui non funziona: la passkey è finita in un gestore che non la supporta. Puoi aprire Spell senza codice su questo dispositivo.';
+            $('[data-a=bio-on]').hidden = true;
+          } else if (ls.get('sp-bio-wait')) { $('[data-a=bio-on]').textContent = 'Conferma l\'impronta'; err('Tocca ancora per confermare.'); }
+          else err('Passkey non creata. Se compare un altro gestore di password, scegli Google Password Manager, oppure usa "Senza codice".');
+        }
+      });
+      $('[data-a=remember]').addEventListener('click', async () => {
+        const c = await configFrom(pending);
+        localStorage.setItem('sp-gh', JSON.stringify(c));
+        el.remove(); resolve(c);
+      });
+      $('[data-a=always]').addEventListener('click', () => { ls.set('sp-ask', true); ls.del('sp-bio-wait'); done(pending); });
+      $('[data-a=bio]').addEventListener('click', async () => { err(); try { done(await bioKey()); } catch (x) { err('Impronta non riconosciuta. Riprova o usa il codice.'); } });
+      $('[data-a=use-code]').addEventListener('click', () => { err(); show('code'); });
+
+      if (ls.get('sp-bio')) {
+        show('bio');
+        // Android apre l'impronta da solo; Safari vuole un tocco, e allora resta il pulsante
+        bioKey().then(done).catch(() => {});
+      } else show('code');
+    });
+  }
+
+  // senza accesso.json (prove in locale): si incollano repository e chiave
+  async function pasteKey() {
+    const el = document.createElement('div');
+    el.className = 'setup';
+    el.innerHTML = `<h1>Spell</h1><p>Collega il repository privato dei dati.</p>
+      <label>Repository<input id="gh-repo" value="GR1S0/spell-data" autocomplete="off" spellcheck="false"></label>
+      <label>Chiave GitHub<input id="gh-token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+      <button type="button" class="big">Collega</button><p class="muted">La chiave resta solo su questo dispositivo.</p>`;
+    document.body.appendChild(el);
+    return new Promise(res => el.querySelector('button').addEventListener('click', () => {
+      const repo = el.querySelector('#gh-repo').value.trim(), token = el.querySelector('#gh-token').value.trim();
+      if (!repo || !token) return;
+      localStorage.setItem('sp-gh', JSON.stringify({repo, token})); el.remove(); res({repo, token});
+    }));
+  }
+  return async () => (await lockScreen()) || pasteKey();
+})();
+</script>
+<script>
+(() => {
+  const $ = q => document.querySelector(q);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+  const ico = n => `<svg class="i"><use href="#i-${n}"/></svg>`;
+  const mmss = s => { s = Math.max(0, Math.round(s || 0)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const quando = iso => { const d = new Date(iso); if (isNaN(d)) return '';
+    const oggi = new Date(), ieri = new Date(Date.now() - 864e5), ora = d.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'});
+    if (d.toDateString() === oggi.toDateString()) return `Oggi, ${ora}`;
+    if (d.toDateString() === ieri.toDateString()) return `Ieri, ${ora}`;
+    return d.toLocaleDateString('it-IT', {day: 'numeric', month: 'short'}) + `, ${ora}`; };
+  let toastT;
+  const toast = t => { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600); };
+
+  const titolo = p => p.titolo || (p.testo ? p.testo.trim().split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:!?]+$/, '') + (p.testo.trim().split(/\s+/).length > 7 ? '…' : '') : 'Pensiero ' + (quando(p.creato).toLowerCase()));
+  const STATI = {
+    coda: ['In coda · parte appena c\'è rete', 'up', false],
+    invio: ['Invio…', 'up', true],
+    attesa: ['Inviato · il Mac lo trascrive', 'laptop', false],
+    pronto: ['', 'text', false],
+  };
+
+  /* ---------- lista ---------- */
+  let openRow = null;
+  function render() {
+    const ps = SP.pensieri();
+    $('[data-s=n]').textContent = ps.length;
+    $('[data-s=min]').textContent = mmss(ps.reduce((a, p) => a + (p.durata || 0), 0));
+    const att = ps.filter(p => p.stato !== 'pronto').length;
+    $('[data-s=att]').textContent = att; $('[data-s=att]').classList.toggle('hot', att > 0);
+    $('#empty').hidden = ps.length > 0;
+    const ul = $('#list'), keep = new Map([...ul.children].map(li => [li.dataset.id, li]));
+    const frag = document.createDocumentFragment();
+    for (const p of ps) {
+      const [stTxt, stIco, busy] = STATI[p.stato] || STATI.attesa;
+      const html = `<button class="del" type="button" aria-label="Elimina">${ico('trash')}</button>
+        <div class="fg"><div class="ic">${ico(p.secondBrain ? 'brain' : stIco)}</div><div class="tx">
+        <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${mmss(p.durata)}</div>
+        ${p.testo ? `<div class="b">${esc(p.riscritto || p.testo)}</div>` : p.stato === 'pronto' ? `<div class="st err"><i></i>${esc(p.errore || 'Nessuna parola riconosciuta')}</div>` : `<div class="st${busy ? ' go' : ''}"><i></i>${stTxt}</div>`}
+        </div></div>`;
+      let li = keep.get(p.id);
+      if (!li) { li = document.createElement('li'); li.className = 'row'; li.dataset.id = p.id; swipe(li); }
+      if (li._html !== html) { li.innerHTML = html; li._html = html; li._x = 0; }
+      keep.delete(p.id); frag.appendChild(li);
+    }
+    ul.replaceChildren(frag);
+    if (cur) showDetail(cur, true);
+  }
+
+  function swipe(li) {
+    let x0 = 0, y0 = 0, dx = 0, on = false, moved = false;
+    const fg = () => li.querySelector('.fg');
+    const setX = x => { li._x = x; li.classList.toggle('sw', x !== 0); fg().style.transform = x ? `translateX(${x}px)` : ''; };
+    li.addEventListener('pointerdown', e => {
+      if (e.target.closest('.del')) return;
+      x0 = e.clientX; y0 = e.clientY; dx = 0; on = true; moved = false;
+    });
+    li.addEventListener('pointermove', e => {
+      if (!on) return;
+      const mx = e.clientX - x0, my = e.clientY - y0;
+      if (!moved && Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my)) { moved = true; li.classList.add('drag'); li.setPointerCapture(e.pointerId); }
+      if (!moved) return;
+      dx = mx; setX(Math.max(-96, Math.min(0, (openRow === li ? -72 : 0) + dx)));
+    });
+    const end = () => {
+      if (!on) return; on = false; li.classList.remove('drag');
+      if (!moved) return;
+      const open = li._x < -36; setX(open ? -72 : 0);
+      if (open && openRow && openRow !== li) closeRow();
+      openRow = open ? li : (openRow === li ? null : openRow);
+    };
+    li.addEventListener('pointerup', end); li.addEventListener('pointercancel', end);
+    li.addEventListener('click', e => {
+      if (moved) { moved = false; return; }
+      if (e.target.closest('.del')) return chiediElimina(li.dataset.id);
+      if (openRow) return closeRow();
+      openDetail(li.dataset.id);
+    });
+  }
+  function closeRow() { if (!openRow) return; const f = openRow.querySelector('.fg'); f.style.transform = ''; openRow._x = 0; openRow.classList.remove('sw'); openRow = null; }
+
+  /* ---------- eliminare, con conferma ---------- */
+  function chiediElimina(id) {
+    const p = SP.pensieri().find(x => x.id === id); if (!p) return;
+    const el = document.createElement('div'); el.id = 'ask';
+    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Eliminare questo pensiero?</h4>
+      <p>“${esc(titolo(p))}” verrà eliminato definitivamente, dal telefono e dal Mac, insieme all'audio e alla trascrizione.</p>
+      <div class="bt"><button class="btn" type="button" data-a="no">Annulla</button><button class="btn danger" type="button" data-a="si">Elimina</button></div></div>`;
+    document.body.appendChild(el);
+    const close = () => { el.remove(); closeRow(); };
+    el.addEventListener('click', e => { if (e.target === el || e.target.closest('[data-a=no]')) close(); });
+    el.querySelector('[data-a=si]').addEventListener('click', async () => {
+      const b = el.querySelector('[data-a=si]'); b.disabled = true; b.textContent = 'Elimino…';
+      try { await SP.elimina(id); close(); if (cur === id) hideDetail(); toast('Pensiero eliminato'); }
+      catch (e) { close(); toast(e.code === 'busy' ? 'Sta partendo proprio ora: riprova tra un attimo' : e.code === 'offline' ? 'Serve la rete per eliminarlo' : 'Non sono riuscito a eliminarlo'); }
+    });
+  }
+
+  /* ---------- un pensiero aperto ---------- */
+  let cur = null, tab = 0;
+  const player = new Audio(); player.preload = 'metadata';
+  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
+  function hideDetail() { cur = null; player.pause(); $('#detail').classList.remove('on'); $('#detail').setAttribute('aria-hidden', 'true'); }
+  function showDetail(id, refresh) {
+    const p = SP.pensieri().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
+    const d = q => $('#detail [data-d=' + q + ']');
+    d('title').textContent = titolo(p);
+    d('when').textContent = `${quando(p.creato)} · ${mmss(p.durata)}`;
+    d('seg').hidden = !p.riscritto;
+    d('seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.t === tab));
+    const t = d('text');
+    if (p.testo) { t.className = 'text'; t.textContent = tab && p.riscritto ? p.riscritto : p.testo; }
+    else if (p.stato === 'pronto') { t.className = 'text wait'; t.textContent = p.errore ? p.errore + '. L\'audio è qui sotto.' : 'Nessuna parola riconosciuta. L\'audio è qui sotto.'; }
+    else { t.className = 'text wait'; t.innerHTML = ico((STATI[p.stato] || STATI.attesa)[1]) + esc((STATI[p.stato] || STATI.attesa)[0]) + '. La trascrizione comparirà qui.'; }
+    d('sb').hidden = !p.secondBrain;
+    if (!refresh) d('time').textContent = mmss(p.durata);
+  }
+  $('#detail [data-d=seg]').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tab = +b.dataset.t; showDetail(cur); });
+  $('#detail [data-a=back]').addEventListener('click', () => history.back());
+  $('#detail [data-a=del]').addEventListener('click', () => cur && chiediElimina(cur));
+  addEventListener('popstate', () => { if (cur) hideDetail(); });
+  const playBtn = $('#detail [data-a=play]'), fill = $('#detail .track i');
+  playBtn.addEventListener('click', async () => {
+    if (!player.paused) return player.pause();
+    if (!player.src) { const u = await SP.audio(cur).catch(() => null); if (!u) return toast('Audio non disponibile senza rete'); player.src = u; }
+    player.play().catch(() => toast('Non riesco a riprodurlo'));
+  });
+  const syncPlay = () => { playBtn.innerHTML = ico(player.paused ? 'play' : 'pause'); };
+  player.addEventListener('play', syncPlay); player.addEventListener('pause', syncPlay);
+  player.addEventListener('ended', () => { fill.style.width = '0'; syncPlay(); });
+  player.addEventListener('timeupdate', () => {
+    const dur = isFinite(player.duration) ? player.duration : (SP.pensieri().find(x => x.id === cur) || {}).durata || 0;
+    fill.style.width = dur ? Math.min(100, player.currentTime / dur * 100) + '%' : '0';
+    $('#detail [data-d=time]').textContent = mmss(player.currentTime);
+  });
+
+  /* ---------- registrare ---------- */
+  const MAX_S = 10 * 60; // un pensiero dura al massimo 10 minuti
+  const MIMES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
+  const NBARS = 22;
+  $('#bars').innerHTML = '<i></i>'.repeat(NBARS);
+  const barEls = [...$('#bars').children];
+  let rec = null; // {mr, stream, ctx, chunks, t0, raf, lock, discard}
+
+  async function startRec() {
+    if (rec) return;
+    if (!window.MediaRecorder || !navigator.mediaDevices) return toast('Questo browser non sa registrare');
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}}); }
+    catch (e) { return toast(e.name === 'NotAllowedError' ? 'Serve il permesso del microfono' : 'Microfono non disponibile'); }
+    const mime = MIMES.find(m => MediaRecorder.isTypeSupported(m)) || '';
+    const mr = new MediaRecorder(stream, mime ? {mimeType: mime, audioBitsPerSecond: 32000} : {});
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = ctx.createAnalyser(); an.fftSize = 512; ctx.createMediaStreamSource(stream).connect(an);
+    rec = {mr, stream, ctx, an, chunks: [], t0: performance.now(), creato: new Date().toISOString(), hist: new Array(NBARS).fill(0), discard: false};
+    // ogni secondo un pezzo, e la bozza su IndexedDB: se l'app viene chiusa a metà, il pensiero si recupera
+    mr.ondataavailable = e => {
+      const r = rec; if (!r || !e.data || !e.data.size) return;
+      r.chunks.push(e.data);
+      if (!r.discard && r.mr.state === 'recording') SP.bozza({creato: r.creato, mime: r.mr.mimeType, durata: (performance.now() - r.t0) / 1000}, r.chunks);
+    };
+    mr.onstop = finish;
+    mr.start(1000);
+    try { rec.lock = await navigator.wakeLock?.request('screen'); } catch (e) {} // schermo acceso mentre parli
+    if (navigator.vibrate) navigator.vibrate(12);
+    $('#rec').hidden = true; $('#live').hidden = false;
+    tick();
+  }
+  function tick() {
+    if (!rec) return;
+    const buf = new Float32Array(rec.an.fftSize); rec.an.getFloatTimeDomainData(buf);
+    let s = 0; for (const v of buf) s += v * v;
+    const lvl = Math.min(1, Math.sqrt(s / buf.length) * 7);
+    const now = performance.now();
+    if (!rec.lastBar || now - rec.lastBar > 60) { rec.lastBar = now; rec.hist.push(lvl); rec.hist.shift(); barEls.forEach((b, i) => { b.style.height = (4 + rec.hist[i] * 22).toFixed(1) + 'px'; }); }
+    const el = (now - rec.t0) / 1000;
+    $('#clock').textContent = mmss(el);
+    if (el >= MAX_S) { toast('Dieci minuti: lo chiudo qui'); return stopRec(); }
+    rec.raf = requestAnimationFrame(tick);
+  }
+  function stopRec(discard) {
+    if (!rec || rec.mr.state === 'inactive') return;
+    rec.discard = !!discard; rec.durata = (performance.now() - rec.t0) / 1000;
+    cancelAnimationFrame(rec.raf);
+    rec.mr.stop();
+  }
+  async function finish() {
+    const r = rec; rec = null;
+    r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
+    $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
+    await SP.bozzaVia();
+    if (r.discard) return toast('Registrazione annullata');
+    if (r.durata < 1 || !r.chunks.length) return toast('Troppo breve per salvarlo');
+    const blob = new Blob(r.chunks, {type: r.mr.mimeType || r.chunks[0].type || 'audio/webm'});
+    await SP.aggiungi(blob, r.durata, blob.type, r.creato);
+    if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
+    toast(navigator.onLine ? 'Salvato · lo mando al Mac' : 'Salvato sul telefono · parte appena c\'è rete');
+  }
+  $('#rec').addEventListener('click', startRec);
+  $('#stop').addEventListener('click', () => stopRec(false));
+  $('#annulla').addEventListener('click', () => stopRec(true));
+  addEventListener('pagehide', () => stopRec(false)); // se l'app viene chiusa mentre registri, salvo quello che c'è (e c'è comunque la bozza)
+
+  /* ---------- rete ---------- */
+  function net() {
+    const el = $('#net'), off = !navigator.onLine;
+    el.classList.toggle('off', off); el.lastElementChild.textContent = off ? 'Senza rete · salvo sul telefono' : 'Trascrive il tuo Mac';
+  }
+  addEventListener('online', net); addEventListener('offline', net);
+
+  /* ---------- avvio ---------- */
+  function fatal(e) {
+    document.body.innerHTML = `<div class="fatal"><h1 class="serif">Spell</h1><p class="muted">${e && e.code === 'auth'
+      ? 'La chiave di GitHub non funziona più (scaduta o senza permessi su spell-data). Rifai lo sblocco dopo aver aggiornato la chiave.'
+      : 'Qualcosa non va con i dati.'}</p><button class="big" type="button">Sblocca di nuovo</button></div>`;
+    document.querySelector('.fatal button').onclick = () => { SP.forget(); location.reload(); };
+  }
+  SP.on(render);
+  SP.start(fatal).then(ok => { if (!ok) return; $('#app').hidden = false; $('#dock').hidden = false; net(); render();
+    if (ok === 'recuperato') toast('Ho recuperato un pensiero rimasto a metà'); });
+})();
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});</script>
+</body>
+</html>
