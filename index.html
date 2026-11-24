@@ -26,7 +26,7 @@
     --ink:#161616; --accent:#5b3bc4; --accent-soft:rgba(91,59,196,.1); --muted:#76767a; --rule:rgba(22,22,22,.07); --line:rgba(22,22,22,.09);
     --red:#d64545;
     /* colori che cambiano col tema: bordo dei riquadri, testo sui pulsanti scuri, tocco, capsula Registra */
-    --edge:rgba(0,0,0,.12); --on-ink:#fff; --press:rgba(0,0,0,.06); --capsule:#111; --segno:.2; --seg-on:#fff;
+    --edge:rgba(0,0,0,.12); --on-ink:#fff; --press:rgba(0,0,0,.06); --capsule:#111; --viola-pieno:#5b3bc4; --segno:.2; --seg-on:#fff;
     color-scheme:light dark;
     /* Editorial New e Neue Montreal arrivano dal repository privato dopo lo sblocco; prima, quelli di sistema */
     --serif:Editorial,ui-serif,"New York","Iowan Old Style","Noto Serif",Georgia,serif;
@@ -39,7 +39,7 @@
       --canvas:#121211; --card:#1b1b1a; --row:#252524; --row-on:#252524; --box:#1f1f1e;
       --ink:#ecece8; --accent:#9478f0; --accent-soft:rgba(148,120,240,.14); --muted:#9a9a9d; --rule:rgba(255,255,255,.08); --line:rgba(255,255,255,.1);
       --red:#e5484d;
-      --edge:rgba(255,255,255,.1); --on-ink:#121211; --press:rgba(255,255,255,.08); --capsule:#6f52e0; --segno:.3; --seg-on:#353533;
+      --edge:rgba(255,255,255,.1); --on-ink:#121211; --press:rgba(255,255,255,.08); --capsule:#6f52e0; --viola-pieno:#6f52e0; --segno:.3; --seg-on:#353533;
     }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -154,7 +154,7 @@
   .play{width:48px;height:48px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);transition:background .2s,color .2s;display:grid;place-items:center;flex:none}
   .play svg{width:18px;height:18px;fill:currentColor;stroke:none}
   /* audio fermo all'inizio (nessuna barra viola): il play è viola */
-  .play.fermo{background:var(--accent);color:#fff}
+  .play.fermo{background:var(--viola-pieno);color:#fff}
   .track{flex:1;height:4px;border-radius:2px;background:var(--rule);position:relative;overflow:hidden}
   .track i{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:2px;background:var(--accent);transform:translateX(-100%);will-change:transform}
   .player span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
