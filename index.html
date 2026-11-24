@@ -149,8 +149,10 @@
   .text{margin-top:14px;background:var(--box);border-radius:14px;padding:14px;font-size:16px;line-height:1.55;white-space:pre-wrap;word-break:break-word;min-height:120px;user-select:text}
   .text.wait{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:10px}
   .player{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
-  .play{width:38px;height:38px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);display:grid;place-items:center;flex:none}
-  .play svg{width:15px;height:15px;fill:currentColor;stroke:none}
+  .play{width:48px;height:48px;border-radius:50%;border:0;background:var(--ink);color:var(--on-ink);transition:background .2s,color .2s;display:grid;place-items:center;flex:none}
+  .play svg{width:18px;height:18px;fill:currentColor;stroke:none}
+  /* audio fermo all'inizio (nessuna barra viola): il play è viola */
+  .play.fermo{background:var(--accent);color:#fff}
   .track{flex:1;height:4px;border-radius:2px;background:var(--rule);position:relative;overflow:hidden}
   .track i{position:absolute;left:0;top:0;bottom:0;width:100%;border-radius:2px;background:var(--accent);transform:translateX(-100%);will-change:transform}
   .player span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
@@ -874,7 +876,7 @@ window.SP_LOCK = (() => {
   /* ---------- un pensiero aperto ---------- */
   let cur = null, tab = 0;
   const player = new Audio(); player.preload = 'metadata';
-  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'translateX(-100%)'; showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
+  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'translateX(-100%)'; syncPlay(); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
   function hideDetail() { cur = null; player.pause(); $('#detail').classList.remove('on'); $('#detail').setAttribute('aria-hidden', 'true'); }
   function showDetail(id, refresh) {
     const p = SP.pensieri().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
@@ -900,7 +902,10 @@ window.SP_LOCK = (() => {
     if (!player.src) { const u = await SP.audio(cur).catch(() => null); if (!u) return toast('Audio non disponibile senza rete'); player.src = u; }
     player.play().catch(() => toast('Non riesco a riprodurlo'));
   });
-  const syncPlay = () => { playBtn.innerHTML = ico(player.paused ? 'play' : 'pause'); };
+  const syncPlay = () => {
+    playBtn.innerHTML = ico(player.paused ? 'play' : 'pause');
+    playBtn.classList.toggle('fermo', player.paused && (player.ended || !player.currentTime || !player.src));
+  };
   player.addEventListener('play', syncPlay); player.addEventListener('pause', syncPlay);
   // durata: quella misurata mentre registravi; quella del file solo se è credibile (i webm di Chrome spesso non la dicono)
   const durata = () => {
@@ -943,8 +948,47 @@ window.SP_LOCK = (() => {
   const barEls = [...$('#bars').children];
   let rec = null; // {mr, stream, ctx, chunks, t0, raf, lock, discard}
 
+  /* ---------- suoni: le stesse note di SPELL sul Mac, generate al volo (nessun file) ---------- */
+  // avvio: Mi → La, "ti ascolto" · annullato: La → Mi grave · inviato: Do–Mi–Sol acuti, "fatto!"
+  // pausa: una nota che si posa · ripresa: due note brevi che salgono
+  const SUONI = {
+    avvio:     {note: [[659.3, 0, .10], [880, .06, .16]], vol: .22, dec: 16, arm: .05},
+    annullato: {note: [[587.3, 0, .12], [392, .08, .22]], vol: .24, dec: 12, arm: .08},
+    inviato:   {note: [[1046.5, 0, .16], [1318.5, .07, .18], [1568, .14, .34]], vol: .3, dec: 9, arm: .25},
+    pausa:     {note: [[659.3, 0, .10], [523.3, .06, .18]], vol: .2, dec: 14, arm: .05},
+    ripresa:   {note: [[523.3, 0, .08], [659.3, .05, .12]], vol: .2, dec: 16, arm: .05},
+  };
+  let suonoCtx = null;
+  const suoniPronti = () => {
+    try { suonoCtx = suonoCtx || new (window.AudioContext || window.webkitAudioContext)(); if (suonoCtx.state === 'suspended') suonoCtx.resume(); } catch (e) {}
+  };
+  // suona e dice quanti millisecondi dura (per non registrare il suono stesso)
+  function suona(nome) {
+    const s = SUONI[nome]; suoniPronti(); if (!s || !suonoCtx) return 0;
+    try {
+      const c = suonoCtx, t0 = c.currentTime + .02;
+      for (const [f, inizio, durata] of s.note) {
+        // inviluppo come sul Mac: attacco di 4 ms, decadimento esponenziale, coda di 10 ms senza clic
+        const n = 64, curva = new Float32Array(n);
+        for (let i = 0; i < n; i++) { const t = i / (n - 1) * durata; curva[i] = s.vol * Math.min(1, t / .004) * Math.min(1, (durata - t) / .01) * Math.exp(-t * s.dec); }
+        for (const [molt, amp] of [[1, 1], [2, s.arm], [3, s.arm * .3]]) {
+          if (!amp) continue;
+          // oscillatore → peso dell'armonica → curva comune → altoparlante
+          const o = c.createOscillator(), peso = c.createGain(), g = c.createGain();
+          o.frequency.value = f * molt; peso.gain.value = amp; g.gain.value = 0;
+          o.connect(peso); peso.connect(g); g.connect(c.destination);
+          g.gain.setValueCurveAtTime(curva, t0 + inizio, durata);
+          o.start(t0 + inizio); o.stop(t0 + inizio + durata + .02);
+        }
+      }
+      return Math.round((Math.max(...s.note.map(x => x[1] + x[2])) + .04) * 1000);
+    } catch (e) { return 0; }
+  }
+  const aspetta = ms => new Promise(r => setTimeout(r, ms));
+
   async function startRec() {
     if (rec) return;
+    suoniPronti(); // subito, dentro il tocco: Chrome lascia suonare solo dopo un gesto
     if (!window.MediaRecorder || !navigator.mediaDevices) return toast('Questo browser non sa registrare');
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}}); }
@@ -961,6 +1005,9 @@ window.SP_LOCK = (() => {
       if (!r.discard && r.mr.state === 'recording') SP.bozza({creato: r.creato, mime: r.mr.mimeType, durata: parlato(r)}, r.chunks);
     };
     mr.onstop = finish;
+    await aspetta(suona('avvio'));
+    if (!rec || rec.mr !== mr) return;
+    rec.t0 = performance.now();
     mr.start(1000);
     try { rec.lock = await navigator.wakeLock?.request('screen'); } catch (e) {} // schermo acceso mentre parli
     if (navigator.vibrate) navigator.vibrate(12);
@@ -972,8 +1019,15 @@ window.SP_LOCK = (() => {
   const parlato = r => (performance.now() - r.t0 - r.pausato - (r.inPausa ? performance.now() - r.inPausa : 0)) / 1000;
   function pausa() {
     const r = rec; if (!r) return;
-    if (r.mr.state === 'recording') { r.mr.pause(); r.inPausa = performance.now(); }
-    else if (r.mr.state === 'paused') { r.mr.resume(); r.pausato += performance.now() - r.inPausa; r.inPausa = 0; }
+    if (r.mr.state === 'recording') { r.mr.pause(); r.inPausa = performance.now(); suona('pausa'); }
+    else if (r.mr.state === 'paused' && !r.riprende) {
+      // prima il suono, poi si riprende a registrare
+      r.riprende = true;
+      setTimeout(() => { r.riprende = false; if (rec !== r || r.mr.state !== 'paused') return; r.mr.resume(); r.pausato += performance.now() - r.inPausa; r.inPausa = 0; }, suona('ripresa'));
+      $('#live').classList.remove('pausa'); $('#pausa').innerHTML = ico('pause'); $('#pausa').setAttribute('aria-label', 'Pausa');
+      if (navigator.vibrate) navigator.vibrate(8);
+      return;
+    }
     else return;
     const ferma = !!r.inPausa;
     $('#live').classList.toggle('pausa', ferma);
@@ -1005,11 +1059,12 @@ window.SP_LOCK = (() => {
     r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
     $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
     await SP.bozzaVia();
-    if (r.discard) return toast('Registrazione annullata');
-    if (r.durata < 1 || !r.chunks.length) return toast('Troppo breve per salvarlo');
+    if (r.discard) { suona('annullato'); return toast('Registrazione annullata'); }
+    if (r.durata < 1 || !r.chunks.length) { suona('annullato'); return toast('Troppo breve per salvarlo'); }
     const blob = new Blob(r.chunks, {type: r.mr.mimeType || r.chunks[0].type || 'audio/webm'});
     await SP.aggiungi(blob, r.durata, blob.type, r.creato);
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
+    suona('inviato');
     toast(navigator.onLine ? 'Salvato · lo mando al Mac' : 'Salvato sul telefono · parte appena c\'è rete');
   }
   $('#rec').addEventListener('click', startRec);
