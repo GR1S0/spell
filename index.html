@@ -39,7 +39,7 @@
       --canvas:#121211; --card:#1b1b1a; --row:#252524; --row-on:#252524; --box:#1f1f1e;
       --ink:#ecece8; --accent:#9478f0; --accent-soft:rgba(148,120,240,.14); --muted:#9a9a9d; --rule:rgba(255,255,255,.08); --line:rgba(255,255,255,.1);
       --red:#e8625f;
-      --edge:rgba(255,255,255,.1); --on-ink:#121211; --press:rgba(255,255,255,.08); --capsule:#2a2a28; --segno:.1; --seg-on:#353533;
+      --edge:rgba(255,255,255,.1); --on-ink:#121211; --press:rgba(255,255,255,.08); --capsule:#6f52e0; --segno:.1; --seg-on:#353533;
     }
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -134,7 +134,7 @@
   .ghost{border:0;background:none;display:inline-flex;align-items:center;gap:4px;padding:8px 6px;border-radius:10px;font-size:15px}
   .ghost:active{background:var(--press)}
   .ghost.red{color:var(--red)}
-  [data-a=back]{font-size:17px}
+  [data-a=back]{font-size:19px}
   [data-a=back] svg{color:var(--accent);stroke-width:2.2}
   .dcard{background:var(--card);border-radius:22px;border:1px solid var(--edge);padding:20px 18px 18px}
   .dcard h3{margin:0;font:400 30px/1.1 var(--serif);letter-spacing:-.01em;word-break:break-word}
@@ -901,19 +901,33 @@ window.SP_LOCK = (() => {
     const reg = (SP.pensieri().find(x => x.id === cur) || {}).durata || 0, file = player.duration;
     return isFinite(file) && file > 0 && (!reg || Math.abs(file - reg) < Math.max(2, reg * 0.2)) ? file : reg;
   };
-  const avanzamento = () => {
-    const dur = durata(), t = Math.min(player.currentTime, dur || player.currentTime);
+  const disegna = t => {
+    const dur = durata(); t = Math.max(0, Math.min(t, dur || t));
     fill.style.transform = `translateX(${(dur ? Math.min(1, t / dur) : 0) * 100 - 100}%)`;
     $('#detail [data-d=time]').textContent = mmss(t);
   };
-  // barra fluida: mentre suona si ridisegna a ogni fotogramma (timeupdate arriva solo 4 volte al secondo)
-  let fotogramma = 0;
-  const scorri = () => { avanzamento(); fotogramma = player.paused ? 0 : requestAnimationFrame(scorri); };
-  player.addEventListener('playing', () => { cancelAnimationFrame(fotogramma); scorri(); });
-  player.addEventListener('pause', () => { cancelAnimationFrame(fotogramma); avanzamento(); });
-  player.addEventListener('seeked', avanzamento);
-  player.addEventListener('timeupdate', avanzamento); // riserva, se i fotogrammi sono fermi (app in secondo piano)
-  player.addEventListener('ended', () => { cancelAnimationFrame(fotogramma); fill.style.transform = 'translateX(-100%)'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
+  // barra fluida: a ogni fotogramma avanza col tempo vero, a velocità costante.
+  // Il tempo del lettore all'inizio resta fermo e poi scatta (il suono sta partendo), e dopo arriva a gradini:
+  // la barra parte solo quando l'audio è partito davvero e lo segue piano piano, senza mai fermarsi o saltare.
+  let fotogramma = 0, pos = 0, partito = false, prima = 0;
+  const scorri = ora => {
+    const dt = prima ? Math.min(0.1, (ora - prima) / 1000) : 0; prima = ora;
+    const reale = player.currentTime;
+    if (!partito && reale > 0) { partito = true; pos = reale; }
+    if (partito) {
+      const correzione = Math.max(-0.5, Math.min(0.5, (reale - pos) * 2)); // tra 0,5 e 1,5 volte la velocità: mai indietro
+      pos += dt * player.playbackRate * (1 + correzione);
+      if (Math.abs(reale - pos) > 0.6) pos = reale; // fuori strada (salto, ricerca): si riallinea
+    }
+    disegna(pos);
+    fotogramma = player.paused ? 0 : requestAnimationFrame(scorri);
+  };
+  const ferma = () => { cancelAnimationFrame(fotogramma); fotogramma = 0; };
+  player.addEventListener('playing', () => { ferma(); pos = player.currentTime; partito = pos > 0; prima = 0; fotogramma = requestAnimationFrame(scorri); });
+  player.addEventListener('pause', () => { ferma(); pos = player.currentTime; disegna(pos); });
+  player.addEventListener('seeked', () => { pos = player.currentTime; disegna(pos); });
+  player.addEventListener('timeupdate', () => { if (!fotogramma) disegna(player.currentTime); }); // riserva, se i fotogrammi sono fermi
+  player.addEventListener('ended', () => { ferma(); pos = 0; partito = false; fill.style.transform = 'translateX(-100%)'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
 
   /* ---------- registrare ---------- */
   const MAX_S = 10 * 60; // un pensiero dura al massimo 10 minuti
