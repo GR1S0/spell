@@ -1,7 +1,7 @@
 {
  "id": "/",
- "name": "Spell",
- "short_name": "Spell",
+ "name": "SPELL",
+ "short_name": "SPELL",
  "description": "I tuoi pensieri a voce, trascritti dal Mac",
  "start_url": "./",
  "scope": "./",

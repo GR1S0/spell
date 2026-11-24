@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Spell</title>
+<title>SPELL</title>
 <meta name="theme-color" content="#fafaf8">
 <meta name="robots" content="noindex">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -196,7 +196,7 @@
 
 <div id="app" hidden>
   <header class="top">
-    <div class="brand"><svg class="i"><use href="#i-spell"/></svg>Spell</div>
+    <div class="brand"><svg class="i"><use href="#i-spell"/></svg>SPELL</div>
     <span class="pill" id="net"><i></i><span>Trascrive il tuo Mac</span></span>
   </header>
   <h1>Pensieri</h1>
@@ -539,7 +539,7 @@ window.SP_LOCK = (() => {
     </style>
     <main>
       <img src="icon-192.png" alt="">
-      <h1>Spell</h1>
+      <h1>SPELL</h1>
       <div class="box" data-v="bio" hidden>
         <button class="go" type="button" data-a="bio">Sblocca con l'impronta</button>
         <button class="link" type="button" data-a="use-code">Usa il codice</button>
@@ -550,7 +550,7 @@ window.SP_LOCK = (() => {
         <button class="go" type="submit">Sblocca</button>
       </form>
       <div class="box" data-v="offer" hidden>
-        <p data-e="offer">Come vuoi aprire Spell la prossima volta, su questo dispositivo?</p>
+        <p data-e="offer">Come vuoi aprire SPELL la prossima volta, su questo dispositivo?</p>
         <button class="go" type="button" data-a="bio-on">Con l'impronta</button>
         <button type="button" data-a="remember">Senza codice</button>
         <button class="link" type="button" data-a="always">Chiedi sempre il codice</button>
@@ -580,7 +580,7 @@ window.SP_LOCK = (() => {
     }
     async function bioCreate() {
       const c = await navigator.credentials.create({publicKey: {
-        rp: {name: 'Spell', id: location.hostname}, user: {id: rand(16), name: 'Spell', displayName: 'Spell'}, challenge: rand(32),
+        rp: {name: 'SPELL', id: location.hostname}, user: {id: rand(16), name: 'SPELL', displayName: 'SPELL'}, challenge: rand(32),
         pubKeyCredParams: [{type: 'public-key', alg: -7}, {type: 'public-key', alg: -257}],
         authenticatorSelection: {authenticatorAttachment: 'platform', residentKey: 'preferred', userVerification: 'required'},
         extensions: {prf: {eval: {first: PRF_INPUT}}}}});
@@ -627,7 +627,7 @@ window.SP_LOCK = (() => {
         } catch (x) {
           if (x.message === 'noprf') {
             ls.del('sp-bio-wait');
-            $('[data-e=offer]').textContent = 'L\'impronta qui non funziona: la passkey è finita in un gestore che non la supporta. Puoi aprire Spell senza codice su questo dispositivo.';
+            $('[data-e=offer]').textContent = 'L\'impronta qui non funziona: la passkey è finita in un gestore che non la supporta. Puoi aprire SPELL senza codice su questo dispositivo.';
             $('[data-a=bio-on]').hidden = true;
           } else if (ls.get('sp-bio-wait')) { $('[data-a=bio-on]').textContent = 'Conferma l\'impronta'; err('Tocca ancora per confermare.'); }
           else err('Passkey non creata. Se compare un altro gestore di password, scegli Google Password Manager, oppure usa "Senza codice".');
@@ -654,7 +654,7 @@ window.SP_LOCK = (() => {
   async function pasteKey() {
     const el = document.createElement('div');
     el.className = 'setup';
-    el.innerHTML = `<h1>Spell</h1><p>Collega il repository privato dei dati.</p>
+    el.innerHTML = `<h1>SPELL</h1><p>Collega il repository privato dei dati.</p>
       <label>Repository<input id="gh-repo" value="GR1S0/spell-data" autocomplete="off" spellcheck="false"></label>
       <label>Chiave GitHub<input id="gh-token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
       <button type="button" class="big">Collega</button><p class="muted">La chiave resta solo su questo dispositivo.</p>`;
@@ -880,7 +880,7 @@ window.SP_LOCK = (() => {
 
   /* ---------- avvio ---------- */
   function fatal(e) {
-    document.body.innerHTML = `<div class="fatal"><h1 class="serif">Spell</h1><p class="muted">${e && e.code === 'auth'
+    document.body.innerHTML = `<div class="fatal"><h1 class="serif">SPELL</h1><p class="muted">${e && e.code === 'auth'
       ? 'La chiave di GitHub non funziona più (scaduta o senza permessi su spell-data). Rifai lo sblocco dopo aver aggiornato la chiave.'
       : 'Qualcosa non va con i dati.'}</p><button class="big" type="button">Sblocca di nuovo</button></div>`;
     document.querySelector('.fatal button').onclick = () => { SP.forget(); location.reload(); };
