@@ -38,7 +38,7 @@
     :root{
       --canvas:#121211; --card:#1b1b1a; --row:#252524; --row-on:#252524; --box:#1f1f1e;
       --ink:#ecece8; --accent:#9478f0; --accent-soft:rgba(148,120,240,.14); --muted:#9a9a9d; --rule:rgba(255,255,255,.08); --line:rgba(255,255,255,.1);
-      --red:#e8625f;
+      --red:#e5484d;
       --edge:rgba(255,255,255,.1); --on-ink:#121211; --press:rgba(255,255,255,.08); --capsule:#6f52e0; --segno:.17; --seg-on:#353533;
     }
   }
@@ -69,10 +69,7 @@
 
   /* il riquadro bianco della dashboard */
   .sheet-card{background:var(--card);border-radius:22px;border:1px solid var(--edge);overflow:hidden}
-  .usage{padding:18px 18px 16px}
-  .usage .h{font-size:14px;font-weight:600}
-  .bar{position:relative;height:1px;background:var(--rule);margin:10px 0 14px}
-  .bar::after{content:"";position:absolute;left:0;top:-.5px;width:100px;height:2px;background:var(--ink)}
+  .usage{padding:16px 18px}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .stat{border-radius:12px;border:1px solid var(--line);background:var(--card);padding:12px 12px 10px;min-width:0}
   .stat b{display:block;font:400 28px/1.1 var(--serif);font-variant-numeric:tabular-nums}
@@ -140,7 +137,7 @@
   .ghost{border:0;background:none;display:inline-flex;align-items:center;gap:4px;padding:8px 6px;border-radius:10px;font-size:15px}
   .ghost:active{background:var(--press)}
   .ghost.red{color:var(--red)}
-  [data-a=back]{font-size:19px}
+  [data-a=back]{font-size:18px}
   [data-a=back] svg{color:var(--accent);stroke-width:2.2}
   .dcard{background:var(--card);border-radius:22px;border:1px solid var(--edge);padding:20px 18px 18px}
   .dcard h3{margin:0;font:400 30px/1.1 var(--serif);letter-spacing:-.01em;word-break:break-word}
@@ -231,8 +228,6 @@
 
   <section class="sheet-card">
     <div class="usage">
-      <div class="h">I tuoi pensieri</div>
-      <div class="bar"></div>
       <div class="stats">
         <div class="stat"><b data-s="n">0</b><span>registrati</span></div>
         <div class="stat"><b data-s="min">0:00</b><span>di voce</span></div>
