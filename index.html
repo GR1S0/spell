@@ -39,8 +39,9 @@
   .serif{font-family:var(--serif)}
 
   /* ---------- pagina ---------- */
-  #app{max-width:560px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px calc(130px + var(--safe-b))}
-  .top{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 18px}
+  #app{max-width:560px;margin:0 auto;padding:max(18px,env(safe-area-inset-top)) 16px calc(164px + var(--safe-b))}
+  .top{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 14px}
+  .divisore{border:0;height:1px;background:var(--line);margin:0 4px 18px}
   .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
   .brand svg{width:20px;height:20px;fill:var(--accent);stroke:none}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--ink)}
@@ -97,6 +98,9 @@
     background:linear-gradient(to top,var(--canvas) 55%,rgba(250,250,248,0))}
   .capsule{pointer-events:auto;height:58px;border-radius:999px;background:#111;color:#fff;display:flex;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.06) inset;
     transition:width .32s cubic-bezier(.2,.9,.25,1)}
+  #dock{flex-direction:column;align-items:center}
+  .segno{width:22px;height:22px;fill:var(--accent);opacity:.9;margin-bottom:12px;flex:none}
+  #dock:has(#live:not([hidden])) .segno{opacity:0}
   #rec{width:168px;border:0;justify-content:center;gap:9px;font-size:15px;font-weight:500}
   #rec svg{width:19px;height:19px}
   #rec:active{transform:scale(.98)}
@@ -130,7 +134,7 @@
   .play{width:38px;height:38px;border-radius:50%;border:0;background:var(--ink);color:#fff;display:grid;place-items:center;flex:none}
   .play svg{width:15px;height:15px;fill:currentColor;stroke:none}
   .track{flex:1;height:3px;border-radius:2px;background:var(--rule);position:relative;overflow:hidden}
-  .track i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--accent)}
+  .track i{position:absolute;left:0;top:0;bottom:0;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:left;will-change:transform}
   .player span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
   .sb{display:inline-flex;align-items:center;gap:6px;margin-top:14px;font-size:12px;font-weight:500;color:#fff;background:var(--accent);padding:6px 9px;border-radius:4px}
 
@@ -199,6 +203,7 @@
     <div class="brand"><svg class="i"><use href="#i-spell"/></svg>SPELL</div>
     <span class="pill" id="net"><i></i><span>Trascrive il tuo Mac</span></span>
   </header>
+  <hr class="divisore">
   <h1>Pensieri</h1>
 
   <section class="sheet-card">
@@ -224,6 +229,7 @@
 </div>
 
 <div id="dock" hidden>
+  <svg class="segno" aria-hidden="true"><use href="#i-spell"/></svg>
   <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
   <div id="live" class="capsule" hidden>
     <button class="x" id="annulla" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
@@ -848,7 +854,7 @@ window.SP_LOCK = (() => {
   /* ---------- un pensiero aperto ---------- */
   let cur = null, tab = 0;
   const player = new Audio(); player.preload = 'metadata';
-  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
+  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'scaleX(0)'; showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
   function hideDetail() { cur = null; player.pause(); $('#detail').classList.remove('on'); $('#detail').setAttribute('aria-hidden', 'true'); }
   function showDetail(id, refresh) {
     const p = SP.pensieri().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
@@ -881,12 +887,19 @@ window.SP_LOCK = (() => {
     const reg = (SP.pensieri().find(x => x.id === cur) || {}).durata || 0, file = player.duration;
     return isFinite(file) && file > 0 && (!reg || Math.abs(file - reg) < Math.max(2, reg * 0.2)) ? file : reg;
   };
-  player.addEventListener('ended', () => { fill.style.width = '0'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
-  player.addEventListener('timeupdate', () => {
+  const avanzamento = () => {
     const dur = durata(), t = Math.min(player.currentTime, dur || player.currentTime);
-    fill.style.width = dur ? Math.min(100, t / dur * 100) + '%' : '0';
+    fill.style.transform = `scaleX(${dur ? Math.min(1, t / dur) : 0})`;
     $('#detail [data-d=time]').textContent = mmss(t);
-  });
+  };
+  // barra fluida: mentre suona si ridisegna a ogni fotogramma (timeupdate arriva solo 4 volte al secondo)
+  let fotogramma = 0;
+  const scorri = () => { avanzamento(); fotogramma = player.paused ? 0 : requestAnimationFrame(scorri); };
+  player.addEventListener('playing', () => { cancelAnimationFrame(fotogramma); scorri(); });
+  player.addEventListener('pause', () => { cancelAnimationFrame(fotogramma); avanzamento(); });
+  player.addEventListener('seeked', avanzamento);
+  player.addEventListener('timeupdate', avanzamento); // riserva, se i fotogrammi sono fermi (app in secondo piano)
+  player.addEventListener('ended', () => { cancelAnimationFrame(fotogramma); fill.style.transform = 'scaleX(0)'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
 
   /* ---------- registrare ---------- */
   const MAX_S = 10 * 60; // un pensiero dura al massimo 10 minuti
