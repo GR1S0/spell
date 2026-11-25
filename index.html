@@ -117,10 +117,6 @@
   #rec{width:168px;border:0;justify-content:center;gap:9px;font-size:15px;font-weight:500}
   #rec svg{width:19px;height:19px}
   #rec:active{transform:scale(.98)}
-  /* importa un audio registrato con un'altra app (una riunione, un vocale) */
-  #imp{width:58px;border:0;justify-content:center}
-  #imp svg{width:19px;height:19px}
-  #imp:active{transform:scale(.96)}
   #live{width:min(360px,calc(100vw - 32px));padding:0 7px 0 7px;gap:10px}
   #pausa{width:44px;height:44px} /* grande come il tasto Fine */
   #pausa svg{width:17px;height:17px;fill:currentColor;stroke:none}
@@ -249,7 +245,7 @@
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
         <b>Le tue idee, in un posto solo.</b>
-        <p>Premi Registra e parla, oppure importa un audio con la freccia. Il Mac lo trascrive e te lo rimanda qui.</p>
+        <p>Premi Registra e parla, oppure condividi qui un audio dal registratore. Il Mac lo trascrive e te lo rimanda qui.</p>
       </div>
     </div>
   </section>
@@ -257,8 +253,6 @@
 
 <div id="dock" hidden>
   <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
-  <button id="imp" class="capsule" type="button" aria-label="Importa un audio"><svg class="i"><use href="#i-up"/></svg></button>
-  <input id="file" type="file" accept="audio/*,.m4a,.mp3,.wav,.ogg,.oga,.opus,.aac,.amr,.3gp,.webm,.flac,text/plain,.txt" hidden>
   <div id="live" class="capsule" hidden>
     <button class="x" id="annulla" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
     <span class="rdot"></span>
@@ -1093,7 +1087,7 @@ window.SP_LOCK = (() => {
     try { rec.lock = await navigator.wakeLock?.request('screen'); } catch (e) {} // schermo acceso mentre parli
     if (navigator.vibrate) navigator.vibrate(12);
     $('#live').classList.remove('pausa'); $('#pausa').innerHTML = ico('pause'); $('#pausa').setAttribute('aria-label', 'Pausa');
-    $('#rec').hidden = true; $('#imp').hidden = true; $('#live').hidden = false;
+    $('#rec').hidden = true; $('#live').hidden = false;
     tick();
   }
   // secondi registrati davvero: le pause non contano
@@ -1138,7 +1132,7 @@ window.SP_LOCK = (() => {
   async function finish() {
     const r = rec; rec = null;
     r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
-    $('#live').hidden = true; $('#rec').hidden = false; $('#imp').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
+    $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
     await SP.bozzaVia();
     if (r.discard) { suona('annullato'); return toast('Registrazione annullata'); }
     if (r.durata < 1 || !r.chunks.length) { suona('annullato'); return toast('Troppo breve per salvarlo'); }
@@ -1150,26 +1144,11 @@ window.SP_LOCK = (() => {
   }
   $('#rec').addEventListener('click', startRec);
 
-  /* ---------- importare un audio (il registratore del telefono, un vocale) ---------- */
-  // la durata la dice il file stesso; se non la dice, resta 0 e la scrive il Mac
+  /* ---------- durata di un file condiviso ---------- */
+  // la durata la dice il file stesso; se non la dice, resta 0
   const durataFile = f => new Promise(res => {
     const a = new Audio(), u = URL.createObjectURL(f), fine = v => { URL.revokeObjectURL(u); res(isFinite(v) && v > 0 ? v : 0); };
     a.preload = 'metadata'; a.onloadedmetadata = () => fine(a.duration); a.onerror = () => fine(0); setTimeout(() => fine(0), 8000); a.src = u;
-  });
-  $('#imp').addEventListener('click', () => { if (!rec) $('#file').click(); });
-  $('#file').addEventListener('change', async e => {
-    const f = e.target.files && e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    if (SP.eTesto(f)) {
-      await SP.aggiungiTesto(await f.text(), f.name, f.lastModified);
-      suona('inviato'); return toast('Trascrizione importata · la mando al Mac');
-    }
-    if (f.type && !/^audio\/|^video\/(mp4|3gpp|webm)|octet-stream/.test(f.type) && !/\.(m4a|mp3|wav|ogg|oga|opus|aac|amr|3gp|webm|flac)$/i.test(f.name)) return toast('Non sembra un file audio');
-    toast('Preparo il file…');
-    const quando = f.lastModified ? new Date(f.lastModified) : new Date();
-    await SP.aggiungi(f, await durataFile(f), f.type, quando.toISOString(), f.name);
-    suona('inviato');
-    toast(navigator.onLine ? (f.size > 4 * 1024 * 1024 ? 'Importato · lo mando al Mac a pezzi' : 'Importato · lo mando al Mac') : 'Importato · parte appena c\'è rete');
   });
   $('#stop').addEventListener('click', () => stopRec(false));
   $('#pausa').addEventListener('click', pausa);
