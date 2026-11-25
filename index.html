@@ -79,7 +79,9 @@
   .stat b.hot{color:var(--accent)}
   .stat span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.25}
 
-  .recent{border-top:1px solid var(--rule);padding:14px 0 0;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+  .recent{border-top:1px solid var(--rule);padding:18px 0 0;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+  .recent .hd{display:flex;align-items:baseline;justify-content:space-between;margin:0 18px 12px}
+  .recent h2{margin:0;font:400 23px/1.2 var(--serif)}
   ul#list{list-style:none;margin:0;padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   ul#list:empty{display:none}
   ul#list > li{flex:none} /* le righe tengono la loro altezza: scorre l'elenco */
@@ -268,6 +270,7 @@
       </div>
     </div>
     <div class="recent">
+      <div class="hd"><h2>Ultime voci</h2></div>
       <ul id="list"></ul>
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
