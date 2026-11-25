@@ -59,8 +59,7 @@
   #app[hidden]{display:none}
   /* SPELL e "Trascrive il tuo Mac" restano fermi in alto mentre scorri */
   .testata{position:sticky;top:0;z-index:6;background:var(--canvas);margin:0 -16px;padding:max(18px,env(safe-area-inset-top)) 16px 0}
-  .testata h1{padding-top:18px;margin-bottom:0}
-  .testata{padding-bottom:16px} /* aria sotto il titolo: le schede scorrono sotto senza toccarlo */
+  .testata{padding-bottom:16px} /* aria tra la riga sotto SPELL e la card */
   .top{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 14px}
   .divisore{border:0;height:1px;background:var(--line);margin:0 4px}
   .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
@@ -80,9 +79,7 @@
   .stat b.hot{color:var(--accent)}
   .stat span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.25}
 
-  .recent{border-top:1px solid var(--rule);padding:18px 0 0;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
-  .recent .hd{display:flex;align-items:baseline;justify-content:space-between;margin:0 18px 12px}
-  .recent h2{margin:0;font:400 23px/1.2 var(--serif)}
+  .recent{border-top:1px solid var(--rule);padding:14px 0 0;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
   ul#list{list-style:none;margin:0;padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
   ul#list:empty{display:none}
   ul#list > li{flex:none} /* le righe tengono la loro altezza: scorre l'elenco */
@@ -260,7 +257,6 @@
       <span class="pill" id="net"><i></i><span>Trascrive il tuo Mac</span></span>
     </header>
     <hr class="divisore">
-    <h1>Pensieri</h1>
   </div>
 
   <section class="sheet-card">
@@ -268,11 +264,10 @@
       <div class="stats">
         <div class="stat"><b data-s="n">0</b><span>registrati</span></div>
         <div class="stat"><b data-s="min">0:00</b><span>di voce</span></div>
-        <div class="stat"><b data-s="att">0</b><span>da trascrivere</span></div>
+        <div class="stat"><b data-s="att">0</b><span>da elaborare</span></div>
       </div>
     </div>
     <div class="recent">
-      <div class="hd"><h2>Ultimi pensieri</h2></div>
       <ul id="list"></ul>
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
