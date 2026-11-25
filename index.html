@@ -199,7 +199,8 @@
   .btn.danger{background:var(--red);border-color:var(--red);color:#fff}
 
   #toast{position:fixed;left:50%;bottom:calc(94px + var(--safe-b));transform:translate(-50%,10px);opacity:0;z-index:50;pointer-events:none;
-    background:#111;color:#fff;font-size:13px;font-weight:500;padding:9px 14px;border-radius:999px;transition:.2s;max-width:calc(100vw - 40px);text-align:center}
+    background:#111;color:#fff;font-size:13px;font-weight:500;padding:9px 14px;border-radius:999px;transition:.2s;max-width:calc(100vw - 40px);text-align:center;
+    box-shadow:0 0 0 1px rgba(255,255,255,.28)} /* bordo chiaro: al buio il nero del messaggio si confondeva con lo sfondo */
   #toast.on{opacity:1;transform:translate(-50%,0)}
 
   /* schermate di servizio */
@@ -1312,15 +1313,18 @@ window.SP_LOCK = (() => {
   async function finish() {
     const r = rec; rec = null;
     r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
+    // il suono finale aspetta che il telefono esca dalla modalità chiamata del microfono, altrimenti a volte non si sente
+    const tFermo = performance.now();
+    const suonaDopo = async nome => { await aspetta(Math.max(0, 350 - (performance.now() - tFermo))); suoniPronti(); suona(nome); };
     $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
     await SP.bozzaVia();
-    if (r.discard) { suona('annullato'); return toast('Registrazione annullata'); }
-    if (r.durata < 1 || !r.chunks.length) { suona('annullato'); return toast('Troppo breve per salvarlo'); }
+    if (r.discard) { toast('Registrazione annullata'); return suonaDopo('annullato'); }
+    if (r.durata < 1 || !r.chunks.length) { toast('Troppo breve per salvarlo'); return suonaDopo('annullato'); }
     const blob = new Blob(r.chunks, {type: r.mr.mimeType || r.chunks[0].type || 'audio/webm'});
     await SP.aggiungi(blob, r.durata, blob.type, r.creato);
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
-    suona('inviato');
     toast(navigator.onLine ? 'Salvato · lo mando al Mac' : 'Salvato sul telefono · parte appena c\'è rete');
+    suonaDopo('inviato');
   }
   $('#rec').addEventListener('click', startRec);
 
@@ -1330,9 +1334,10 @@ window.SP_LOCK = (() => {
     const a = new Audio(), u = URL.createObjectURL(f), fine = v => { URL.revokeObjectURL(u); res(isFinite(v) && v > 0 ? v : 0); };
     a.preload = 'metadata'; a.onloadedmetadata = () => fine(a.duration); a.onerror = () => fine(0); setTimeout(() => fine(0), 8000); a.src = u;
   });
-  $('#stop').addEventListener('click', () => stopRec(false));
+  // suoniPronti dentro il tocco: Android può aver sospeso l'audio della pagina mentre il microfono era acceso
+  $('#stop').addEventListener('click', () => { suoniPronti(); stopRec(false); });
   $('#pausa').addEventListener('click', pausa);
-  $('#annulla').addEventListener('click', () => stopRec(true));
+  $('#annulla').addEventListener('click', () => { suoniPronti(); stopRec(true); });
   addEventListener('pagehide', () => stopRec(false)); // se l'app viene chiusa mentre registri, salvo quello che c'è (e c'è comunque la bozza)
 
   /* ---------- rete ---------- */
