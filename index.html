@@ -1233,21 +1233,31 @@ window.SP_LOCK = (() => {
           o.start(t0 + inizio); o.stop(t0 + inizio + durata + .02);
         }
       }
-      return Math.round((Math.max(...s.note.map(x => x[1] + x[2])) + .04) * 1000);
+      const ms = Math.round((Math.max(...s.note.map(x => x[1] + x[2])) + .04) * 1000);
+      fineSuoni = Math.max(fineSuoni, performance.now() + ms);
+      return ms;
     } catch (e) { return 0; }
   }
+  // i suoni non si tagliano mai tra loro (se capitano insieme si sovrappongono): fineSuoni è quando finisce l'ultimo,
+  // e il microfono si accende solo dopo, perché a microfono acceso Android zittisce i suoni della pagina
+  let fineSuoni = 0;
   const aspetta = ms => new Promise(r => setTimeout(r, ms));
 
+  let avviando = false;
   async function startRec() {
-    if (rec) return;
+    if (rec || avviando) return;
     suoniPronti(); // subito, dentro il tocco: Chrome lascia suonare solo dopo un gesto
     if (!window.MediaRecorder || !navigator.mediaDevices) return toast('Questo browser non sa registrare');
     // il suono di avvio parte PRIMA di accendere il microfono: su Android, a microfono acceso (con la cancellazione dell'eco)
     // il telefono passa in modalità chiamata e i suoni della pagina quasi spariscono
-    const tSuono = performance.now(), durataSuono = suona('avvio');
+    // il microfono si accende quando tutti i suoni sono finiti (anche l'annullamento di prima): nessuno viene tagliato
+    avviando = true;
+    suona('avvio');
+    await aspetta(Math.max(0, fineSuoni - performance.now()));
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}}); }
-    catch (e) { return toast(e.name === 'NotAllowedError' ? 'Serve il permesso del microfono' : 'Microfono non disponibile'); }
+    catch (e) { avviando = false; return toast(e.name === 'NotAllowedError' ? 'Serve il permesso del microfono' : 'Microfono non disponibile'); }
+    avviando = false;
     const mime = MIMES.find(m => MediaRecorder.isTypeSupported(m)) || '';
     const mr = new MediaRecorder(stream, mime ? {mimeType: mime, audioBitsPerSecond: 32000} : {});
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1260,8 +1270,6 @@ window.SP_LOCK = (() => {
       if (!r.discard && r.mr.state !== 'inactive') SP.bozza({creato: r.creato, mime: r.mr.mimeType, durata: parlato(r)}, e.data, r.chunks.length);
     };
     mr.onstop = finish;
-    // si registra solo quando il suono è finito, così non finisce nella registrazione
-    await aspetta(Math.max(0, durataSuono - (performance.now() - tSuono)));
     if (!rec || rec.mr !== mr) return;
     rec.t0 = performance.now();
     mr.start(1000);
@@ -1309,13 +1317,16 @@ window.SP_LOCK = (() => {
     rec.discard = !!discard; rec.durata = parlato(rec);
     cancelAnimationFrame(rec.raf);
     rec.mr.stop();
+    // il microfono si spegne subito, al tocco: così il telefono esce prima dalla modalità chiamata e il suono finale arriva prima
+    rec.tFermo = performance.now();
+    rec.stream.getTracks().forEach(t => t.stop());
   }
   async function finish() {
     const r = rec; rec = null;
     r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
     // il suono finale aspetta che il telefono esca dalla modalità chiamata del microfono, altrimenti a volte non si sente
-    const tFermo = performance.now();
-    const suonaDopo = async nome => { await aspetta(Math.max(0, 350 - (performance.now() - tFermo))); suoniPronti(); suona(nome); };
+    const tFermo = r.tFermo || performance.now();
+    const suonaDopo = async nome => { await aspetta(Math.max(0, 150 - (performance.now() - tFermo))); suoniPronti(); suona(nome); };
     $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
     await SP.bozzaVia();
     if (r.discard) { toast('Registrazione annullata'); return suonaDopo('annullato'); }
