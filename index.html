@@ -242,7 +242,7 @@
   <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55A1 1 0 0 1 20.38 20H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
   <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></symbol>
-  <symbol id="i-voce" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9 10.5v3M12 9v6M15 10.5v3"/></symbol>
+  <symbol id="i-voce" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/></symbol>
   <symbol id="i-puzzle" viewBox="0 0 24 24"><path d="M15.39 4.39a1 1 0 0 0 1.68-.474 2.5 2.5 0 1 1 3.014 3.015 1 1 0 0 0-.474 1.68l1.683 1.682a2.414 2.414 0 0 1 0 3.414L19.61 15.39a1 1 0 0 1-1.68-.474 2.5 2.5 0 1 0-3.014 3.015 1 1 0 0 1 .474 1.68l-1.683 1.682a2.414 2.414 0 0 1-3.414 0L8.61 19.61a1 1 0 0 0-1.68.474 2.5 2.5 0 1 1-3.014-3.015 1 1 0 0 0 .474-1.68l-1.683-1.682a2.414 2.414 0 0 1 0-3.414L4.39 8.61a1 1 0 0 1 1.68.474 2.5 2.5 0 1 0 3.014-3.015 1 1 0 0 1-.474-1.68l1.683-1.682a2.414 2.414 0 0 1 3.414 0z"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-text" viewBox="0 0 24 24"><path d="M17 6.1H3M21 12.1H3M15.1 18H3"/></symbol>
@@ -942,7 +942,7 @@ window.SP_LOCK = (() => {
   // una trascrizione già fatta dal registratore: il Mac non la trascrive, la copia (e poi ne scrive il verbale)
   const STATO_TESTO = 'Il Mac sta copiando la trascrizione';
   // l'icona dice a che punto è (in viaggio, al Mac) e, quando è pronto, che cos'è:
-  // una voce registrata qui (nuvoletta con il parlato), un audio condiviso (onda), una trascrizione condivisa (foglio)
+  // una voce registrata qui (fumetto tondo), un audio condiviso (onda), una trascrizione condivisa (foglio)
   // (più frammenti uniti: un pezzo di puzzle, frammenti che combaciano)
   const icona = p => p.secondBrain ? 'brain' : p.stato !== 'pronto' ? (STATI[p.stato] || STATI.attesa)[1]
     : p.unisce ? 'puzzle' : p.soloTesto ? 'doc' : p.importato ? 'wave' : 'voce';
