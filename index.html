@@ -59,7 +59,8 @@
   #app[hidden]{display:none}
   /* SPELL e "Trascrive il tuo Mac" restano fermi in alto mentre scorri */
   .testata{position:sticky;top:0;z-index:6;background:var(--canvas);margin:0 -16px;padding:max(18px,env(safe-area-inset-top)) 16px 0}
-  .testata{padding-bottom:16px} /* aria tra la riga sotto SPELL e la card */
+  .testata h1{padding-top:18px;margin-bottom:0}
+  .testata{padding-bottom:16px} /* aria tra il titolo e la card */
   .top{display:flex;align-items:center;justify-content:space-between;margin:4px 4px 14px}
   .divisore{border:0;height:1px;background:var(--line);margin:0 4px}
   .brand{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
@@ -259,6 +260,7 @@
       <span class="pill" id="net"><i></i><span>Trascrive il tuo Mac</span></span>
     </header>
     <hr class="divisore">
+    <h1>Pensieri e parole</h1>
   </div>
 
   <section class="sheet-card">
@@ -270,7 +272,7 @@
       </div>
     </div>
     <div class="recent">
-      <div class="hd"><h2>Ultime voci</h2></div>
+      <div class="hd"><h2>Ultimi frammenti</h2></div>
       <ul id="list"></ul>
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
@@ -285,7 +287,7 @@
   <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
   <div id="selbar" class="capsule" hidden>
     <button class="x" id="selno" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
-    <span class="n" id="seln">Scegli i pensieri</span>
+    <span class="n" id="seln">Scegli i frammenti</span>
     <button id="unisci" type="button" disabled>Unisci</button>
   </div>
   <div id="live" class="capsule" hidden>
@@ -300,7 +302,7 @@
 
 <div id="detail" aria-hidden="true"><svg class="segno" aria-hidden="true"><use href="#i-spell"/></svg><div class="in">
   <div class="bk">
-    <button class="ghost" type="button" data-a="back"><svg class="i"><use href="#i-back"/></svg>Pensieri</button>
+    <button class="ghost" type="button" data-a="back"><svg class="i"><use href="#i-back"/></svg>Frammenti</button>
     <button class="ghost red" type="button" data-a="del"><svg class="i"><use href="#i-trash"/></svg></button>
     <button class="ghost sep" type="button" data-a="sep" hidden>Separa</button>
   </div>
@@ -929,8 +931,8 @@ window.SP_LOCK = (() => {
   let toastT;
   const toast = t => { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600); };
 
-  const dettaglioRiga = p => p.unisce ? `${p.unisce.length} pensieri uniti` : p.soloTesto ? 'trascrizione' : mmss(p.durata);
-  const titolo = p => p.titolo || (p.unisce && !p.testo ? `${p.unisce.length} pensieri uniti` : '') || (p.testo ? p.testo.trim().split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:!?]+$/, '') + (p.testo.trim().split(/\s+/).length > 7 ? '…' : '') : 'Pensiero ' + (quando(p.creato).toLowerCase()));
+  const dettaglioRiga = p => p.unisce ? `${p.unisce.length} frammenti uniti` : p.soloTesto ? 'trascrizione' : mmss(p.durata);
+  const titolo = p => p.titolo || (p.unisce && !p.testo ? `${p.unisce.length} frammenti uniti` : '') || (p.testo ? p.testo.trim().split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:!?]+$/, '') + (p.testo.trim().split(/\s+/).length > 7 ? '…' : '') : 'Frammento ' + (quando(p.creato).toLowerCase()));
   const STATI = {
     coda: ['In coda · parte appena c\'è rete', 'up', false],
     invio: ['Invio…', 'up', true],
@@ -944,7 +946,7 @@ window.SP_LOCK = (() => {
   // (più pensieri uniti: i fogli uno sopra l'altro)
   const icona = p => p.secondBrain ? 'brain' : p.stato !== 'pronto' ? (STATI[p.stato] || STATI.attesa)[1]
     : p.unisce ? 'layers' : p.soloTesto ? 'doc' : p.importato ? 'wave' : 'voce';
-  const STATO_UNIONE = 'Il Mac sta unendo i pensieri';
+  const STATO_UNIONE = 'Il Mac sta unendo i frammenti';
   // cosa sta facendo il Mac, e cosa comparirà
   const attesa = p => p.unisce ? [STATO_UNIONE, 'Qui compariranno il verbale e tutti i testi.'] : p.soloTesto ? [STATO_TESTO, 'Poi qui comparirà il verbale.']
     : [(STATI[p.stato] || STATI.attesa)[0], p.importato || p.durata >= 600 ? 'Qui compariranno il verbale e la trascrizione.' : 'La trascrizione comparirà qui.'];
@@ -1036,7 +1038,7 @@ window.SP_LOCK = (() => {
   }
   function aggiornaSelezione() {
     const n = scelti ? scelti.size : 0;
-    $('#seln').textContent = n < 2 ? 'Scegli almeno 2 pensieri' : `${n} pensieri scelti`;
+    $('#seln').textContent = n < 2 ? 'Scegli almeno 2 frammenti' : `${n} frammenti scelti`;
     $('#unisci').disabled = n < 2;
     document.querySelectorAll('#list li').forEach(li => li.classList.toggle('sel', !!scelti && scelti.has(li.dataset.id)));
   }
@@ -1067,7 +1069,7 @@ window.SP_LOCK = (() => {
   function chiediElimina(id) {
     const p = SP.tutti().find(x => x.id === id); if (!p) return;
     const el = document.createElement('div'); el.id = 'ask';
-    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Eliminare questo pensiero?</h4>
+    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Eliminare questo frammento?</h4>
       <p>“${esc(titolo(p))}” verrà eliminato definitivamente, dal telefono e dal Mac, insieme all'audio e alla trascrizione.</p>
       <div class="bt"><button class="btn" type="button" data-a="no">Annulla</button><button class="btn danger" type="button" data-a="si">Elimina</button></div></div>`;
     document.body.appendChild(el);
@@ -1075,7 +1077,7 @@ window.SP_LOCK = (() => {
     el.addEventListener('click', e => { if (e.target === el || e.target.closest('[data-a=no]')) close(); });
     el.querySelector('[data-a=si]').addEventListener('click', async () => {
       const b = el.querySelector('[data-a=si]'); b.disabled = true; b.textContent = 'Elimino…';
-      try { await SP.elimina(id); close(); if (cur === id) hideDetail(); toast('Pensiero eliminato'); }
+      try { await SP.elimina(id); close(); if (cur === id) hideDetail(); toast('Frammento eliminato'); }
       catch (e) { close(); toast(e.code === 'busy' ? 'Sta partendo proprio ora: riprova tra un attimo' : e.code === 'offline' ? 'Serve la rete per eliminarlo' : 'Non sono riuscito a eliminarlo'); }
     });
   }
@@ -1134,14 +1136,14 @@ window.SP_LOCK = (() => {
   $('#detail [data-a=sep]').addEventListener('click', () => {
     const p = cur && SP.tutti().find(x => x.id === cur); if (!p) return;
     const el = document.createElement('div'); el.id = 'ask';
-    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Separare questi pensieri?</h4>
-      <p>I ${p.unisce.length} pensieri torneranno separati nell'elenco, ognuno con il suo testo. Il verbale unito verrà eliminato.</p>
+    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Separare questi frammenti?</h4>
+      <p>I ${p.unisce.length} frammenti torneranno separati nell'elenco, ognuno con il suo testo. Il verbale unito verrà eliminato.</p>
       <div class="bt"><button class="btn" type="button" data-a="no">Annulla</button><button class="btn dark" type="button" data-a="si">Separa</button></div></div>`;
     document.body.appendChild(el);
     el.addEventListener('click', e => { if (e.target === el || e.target.closest('[data-a=no]')) el.remove(); });
     el.querySelector('[data-a=si]').addEventListener('click', async () => {
       const b = el.querySelector('[data-a=si]'); b.disabled = true; b.textContent = 'Separo…';
-      try { await SP.elimina(p.id); el.remove(); history.back(); toast('Pensieri separati'); }
+      try { await SP.elimina(p.id); el.remove(); history.back(); toast('Frammenti separati'); }
       catch (e) { el.remove(); toast(e.code === 'offline' ? 'Serve la rete per separarli' : 'Non sono riuscito a separarli'); }
     });
   });
@@ -1355,7 +1357,7 @@ window.SP_LOCK = (() => {
     toast((n === 1 ? 'Ricevuto' : `Ricevuti ${n} file`) + (navigator.onLine ? (n === 1 ? ' · lo mando al Mac' : ' · li mando al Mac') : ' · parte appena c\'è rete'));
   }
   SP.start(fatal).then(ok => { if (!ok) return; $('#app').hidden = false; $('#dock').hidden = false; net(); render();
-    if (ok === 'recuperato') toast('Ho recuperato un pensiero rimasto a metà');
+    if (ok === 'recuperato') toast('Ho recuperato una registrazione rimasta a metà');
     condivisi();
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') condivisi(); }); });
 })();
