@@ -145,9 +145,9 @@
   .dcard{background:var(--card);border-radius:22px;border:1px solid var(--edge);padding:20px 18px 18px}
   .dcard h3{margin:0;font:400 30px/1.1 var(--serif);letter-spacing:-.01em;word-break:break-word}
   .dcard .when{font-size:12px;color:var(--muted);margin-top:6px}
-  .seg{display:inline-flex;background:var(--row);border-radius:9px;padding:2px;margin:16px 0 0}
-  .seg button{border:0;background:none;font-size:13px;font-weight:500;padding:6px 12px;border-radius:7px;color:var(--muted)}
-  .seg button.on{background:var(--seg-on);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .seg{display:flex;background:var(--row);border-radius:12px;padding:3px;margin:18px 0 0}
+  .seg button{flex:1;border:0;background:none;font-size:15px;font-weight:500;padding:11px 14px;border-radius:9px;color:var(--muted)}
+  .seg button.on{background:var(--viola-pieno);color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
   .text{margin-top:14px;background:var(--box);border-radius:14px;padding:14px;font-size:16px;line-height:1.55;white-space:pre-wrap;word-break:break-word;min-height:120px;user-select:text}
   .text.wait{color:var(--muted);font-size:14px;display:flex;align-items:center;gap:10px}
   .player{display:flex;align-items:center;gap:12px;margin-top:14px;padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
@@ -190,8 +190,8 @@
     .row{corner-shape:squircle;border-radius:19px}
     .ghost{corner-shape:squircle;border-radius:16px}
     .dcard{corner-shape:squircle;border-radius:35px}
-    .seg{corner-shape:squircle;border-radius:14px}
-    .seg button{corner-shape:squircle;border-radius:11px}
+    .seg{corner-shape:squircle;border-radius:17px}
+    .seg button{corner-shape:squircle;border-radius:14px}
     .text{corner-shape:squircle;border-radius:22px}
     .player{corner-shape:squircle;border-radius:19px}
     .sb{corner-shape:squircle;border-radius:6px}
@@ -873,11 +873,11 @@ window.SP_LOCK = (() => {
   const STATI = {
     coda: ['In coda · parte appena c\'è rete', 'up', false],
     invio: ['Invio…', 'up', true],
-    attesa: ['Inviato · il Mac lo trascrive', 'laptop', false],
+    attesa: ['Il Mac sta trascrivendo l\'audio', 'laptop', false],
     pronto: ['', 'text', false],
   };
   // una trascrizione già fatta dal registratore: il Mac non la trascrive, la copia (e poi ne scrive il verbale)
-  const STATO_TESTO = 'Inviato · il Mac sta copiando la trascrizione';
+  const STATO_TESTO = 'Il Mac sta copiando la trascrizione';
   // l'icona dice a che punto è (in viaggio, al Mac) e, quando è pronto, che cos'è:
   // una voce registrata qui (microfono), un audio condiviso (onda), una trascrizione condivisa (foglio)
   const icona = p => p.secondBrain ? 'brain' : p.stato !== 'pronto' ? (STATI[p.stato] || STATI.attesa)[1]
@@ -991,7 +991,7 @@ window.SP_LOCK = (() => {
       // due righe: cosa sta succedendo, poi cosa comparirà qui
       const [riga1, riga2] = attesa(p);
       t.className = 'text wait';
-      t.innerHTML = ico((STATI[p.stato] || STATI.attesa)[1]) + `<span>${esc(riga1)}<br>${esc(riga2)}</span>`;
+      t.innerHTML = ico((STATI[p.stato] || STATI.attesa)[1]) + `<span>${esc(riga1)}.<br>${esc(riga2)}</span>`;
     }
     d('sb').hidden = !p.secondBrain;
     if (!refresh) d('time').textContent = mmss(p.durata);
