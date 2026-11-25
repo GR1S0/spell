@@ -213,6 +213,8 @@
   <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></symbol>
   <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
   <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55A1 1 0 0 1 20.38 20H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
+  <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></symbol>
   <symbol id="i-text" viewBox="0 0 24 24"><path d="M17 6.1H3M21 12.1H3M15.1 18H3"/></symbol>
   <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
@@ -271,7 +273,7 @@
   <div class="dcard">
     <h3 data-d="title"></h3>
     <div class="when" data-d="when"></div>
-    <div class="seg" data-d="seg" hidden><button type="button" data-t="0" class="on">Trascrizione</button><button type="button" data-t="1" data-d="seg1">Riscritta</button></div>
+    <div class="seg" data-d="seg" hidden><button type="button"></button><button type="button"></button></div>
     <div class="text" data-d="text"></div>
     <div class="player">
       <button class="play" type="button" data-a="play"><svg class="i"><use href="#i-play"/></svg></button>
@@ -637,12 +639,19 @@ window.SP = (() => {
   }
 
   /* ---------- la lista che vede l'app ---------- */
+  // il Mac scriverà il verbale (stessa regola di Pensieri.swift): file condivisi o registrazioni lunghe, con un po' di testo
+  function verbaleAtteso(m, t) {
+    if (!t || !t.testo || t.riscritto || (t.verbaleTentativi || 0) >= 3) return false;
+    const parole = t.testo.trim().split(/\s+/).length;
+    return (!!(m.importato || m.trascrizione) && parole >= 80) || (m.durata || 0) >= 600 || parole >= 1200;
+  }
   function pensieri() {
-    const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato, progresso: l.progresso, nomeFile: l.nome, soloTesto: l.ext === 'txt'}));
+    const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato, progresso: l.progresso, nomeFile: l.nome, soloTesto: l.ext === 'txt', importato: !!l.nome}));
     for (const [id, m] of Object.entries(st.remoti)) {
       if (locali.some(l => l.id === id)) continue;
       const t = st.testi[id];
-      out.push(Object.assign({id, creato: m.creato, durata: m.durata, nomeFile: m.nomeFile, soloTesto: !!m.trascrizione, stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
+      out.push(Object.assign({id, creato: m.creato, durata: m.durata, nomeFile: m.nomeFile, soloTesto: !!m.trascrizione, importato: !!m.importato,
+        verbaleAtteso: verbaleAtteso(m, t), stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
         testo: t.testo, titolo: t.titolo, riscritto: t.riscritto, verbale: t.tipoRiscritto === 'verbale', errore: t.errore, secondBrain: t.secondBrain} : {}));
     }
     return out.sort((a, b) => (b.creato || '').localeCompare(a.creato || ''));
@@ -868,7 +877,14 @@ window.SP_LOCK = (() => {
     pronto: ['', 'text', false],
   };
   // una trascrizione già fatta dal registratore: il Mac non la trascrive, la copia (e poi ne scrive il verbale)
-  const STATO_TESTO = 'Inviato · il Mac la sta copiando';
+  const STATO_TESTO = 'Inviato · il Mac sta copiando la trascrizione';
+  // l'icona dice a che punto è (in viaggio, al Mac) e, quando è pronto, che cos'è:
+  // una voce registrata qui (microfono), un audio condiviso (onda), una trascrizione condivisa (foglio)
+  const icona = p => p.secondBrain ? 'brain' : p.stato !== 'pronto' ? (STATI[p.stato] || STATI.attesa)[1]
+    : p.soloTesto ? 'doc' : p.importato ? 'wave' : 'mic';
+  // cosa sta facendo il Mac, e cosa comparirà
+  const attesa = p => p.soloTesto ? [STATO_TESTO, 'Poi qui comparirà il verbale.']
+    : [(STATI[p.stato] || STATI.attesa)[0], p.importato || p.durata >= 600 ? 'Qui compariranno il verbale e la trascrizione.' : 'La trascrizione comparirà qui.'];
 
   /* ---------- lista ---------- */
   let openRow = null;
@@ -886,7 +902,7 @@ window.SP_LOCK = (() => {
       if (p.stato === 'invio' && p.progresso) stTxt = `Invio… parte ${p.progresso}`;
       if (p.stato === 'attesa' && p.soloTesto) stTxt = STATO_TESTO;
       const html = `<button class="del" type="button" aria-label="Elimina">${ico('trash')}</button>
-        <div class="fg"><div class="ic">${ico(p.secondBrain ? 'brain' : stIco)}</div><div class="tx">
+        <div class="fg"><div class="ic">${ico(icona(p))}</div><div class="tx">
         <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${p.soloTesto ? 'trascrizione' : mmss(p.durata)}</div>
         ${p.testo ? `<div class="b">${esc(p.riscritto || p.testo)}</div>` : p.stato === 'pronto' ? `<div class="st err"><i></i>${esc(p.errore || 'Nessuna parola riconosciuta')}</div>` : `<div class="st${busy ? ' go' : ''}"><i></i>${stTxt}</div>`}
         </div></div>`;
@@ -949,9 +965,9 @@ window.SP_LOCK = (() => {
   }
 
   /* ---------- un pensiero aperto ---------- */
-  let cur = null, tab = 0;
+  let cur = null, tab = null; // 'r' verbale o riscritta, 't' trascrizione; null = scelta automatica (prima il verbale)
   const player = new Audio(); player.preload = 'metadata';
-  function openDetail(id) { cur = id; tab = 0; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'translateX(-100%)'; syncPlay(); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
+  function openDetail(id) { cur = id; tab = null; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'translateX(-100%)'; syncPlay(); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
   function hideDetail() { cur = null; player.pause(); $('#detail').classList.remove('on'); $('#detail').setAttribute('aria-hidden', 'true'); }
   function showDetail(id, refresh) {
     const p = SP.pensieri().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
@@ -959,22 +975,28 @@ window.SP_LOCK = (() => {
     d('title').textContent = titolo(p);
     d('when').textContent = `${quando(p.creato)} · ${p.soloTesto ? 'trascrizione importata' : mmss(p.durata)}`;
     $('#detail .player').hidden = !!p.soloTesto;
-    d('seg').hidden = !p.riscritto;
-    d('seg1').textContent = p.verbale ? 'Verbale' : 'Riscritta';
-    d('seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.t === tab));
+    // il verbale (anche quello in arrivo) viene prima ed è aperto; la riscrittura di un pensiero resta dopo la trascrizione
+    const conVerbale = p.verbale || p.verbaleAtteso;
+    const ordine = conVerbale ? [['r', 'Verbale'], ['t', 'Trascrizione']] : [['t', 'Trascrizione'], ['r', 'Riscritta']];
+    const scelta = tab || (conVerbale ? 'r' : 't');
+    d('seg').hidden = !p.testo || !(p.riscritto || p.verbaleAtteso);
+    d('seg').querySelectorAll('button').forEach((b, i) => { b.dataset.t = ordine[i][0]; b.textContent = ordine[i][1]; b.classList.toggle('on', ordine[i][0] === scelta); });
     const t = d('text');
-    if (p.testo) { t.className = 'text'; t.textContent = tab && p.riscritto ? p.riscritto : p.testo; }
+    if (p.testo && scelta === 'r' && !p.riscritto && p.verbaleAtteso) {
+      t.className = 'text wait'; t.innerHTML = ico('laptop') + '<span>Il Mac sta scrivendo il verbale.<br>Comparirà qui tra poco.</span>';
+    }
+    else if (p.testo) { t.className = 'text'; t.textContent = scelta === 'r' && p.riscritto ? p.riscritto : p.testo; }
     else if (p.stato === 'pronto') { t.className = 'text wait'; t.textContent = p.errore ? p.errore + '. L\'audio è qui sotto.' : 'Nessuna parola riconosciuta. L\'audio è qui sotto.'; }
     else {
-      // due righe: cosa sta succedendo, poi dove comparirà il testo
-      const [riga, icona] = STATI[p.stato] || STATI.attesa;
+      // due righe: cosa sta succedendo, poi cosa comparirà qui
+      const [riga1, riga2] = attesa(p);
       t.className = 'text wait';
-      t.innerHTML = ico(icona) + `<span>${esc(p.stato === 'attesa' && p.soloTesto ? STATO_TESTO : riga)}<br>La trascrizione comparirà qui.</span>`;
+      t.innerHTML = ico((STATI[p.stato] || STATI.attesa)[1]) + `<span>${esc(riga1)}<br>${esc(riga2)}</span>`;
     }
     d('sb').hidden = !p.secondBrain;
     if (!refresh) d('time').textContent = mmss(p.durata);
   }
-  $('#detail [data-d=seg]').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tab = +b.dataset.t; showDetail(cur); });
+  $('#detail [data-d=seg]').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tab = b.dataset.t; showDetail(cur); });
   $('#detail [data-a=back]').addEventListener('click', () => history.back());
   $('#detail [data-a=del]').addEventListener('click', () => cur && chiediElimina(cur));
   addEventListener('popstate', () => { if (cur) hideDetail(); });
