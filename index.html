@@ -54,7 +54,9 @@
   .serif{font-family:var(--serif)}
 
   /* ---------- pagina ---------- */
-  #app{max-width:560px;margin:0 auto;padding:0 16px calc(130px + var(--safe-b))}
+  /* la pagina sta ferma: titolo, numeri e card restano al loro posto, scorre solo l'elenco dentro la card */
+  #app{max-width:560px;margin:0 auto;padding:0 16px calc(98px + var(--safe-b));height:100dvh;box-sizing:border-box;display:flex;flex-direction:column}
+  #app[hidden]{display:none}
   /* SPELL e "Trascrive il tuo Mac" restano fermi in alto mentre scorri */
   .testata{position:sticky;top:0;z-index:6;background:var(--canvas);margin:0 -16px;padding:max(18px,env(safe-area-inset-top)) 16px 0}
   .testata h1{padding-top:18px;margin-bottom:0}
@@ -70,7 +72,7 @@
   h1{margin:0 4px 14px;font:400 34px/1.05 var(--serif);letter-spacing:-.01em}
 
   /* il riquadro bianco della dashboard */
-  .sheet-card{background:var(--card);border-radius:22px;border:1px solid var(--edge);overflow:hidden}
+  .sheet-card{background:var(--card);border-radius:22px;border:1px solid var(--edge);overflow:hidden;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
   .usage{padding:16px 18px}
   .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
   .stat{border-radius:12px;border:1px solid var(--line);background:var(--card);padding:12px 12px 10px;min-width:0}
@@ -78,10 +80,12 @@
   .stat b.hot{color:var(--accent)}
   .stat span{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.25}
 
-  .recent{border-top:1px solid var(--rule);padding:18px 14px 14px}
-  .recent .hd{display:flex;align-items:baseline;justify-content:space-between;margin:0 4px 12px}
+  .recent{border-top:1px solid var(--rule);padding:18px 0 0;flex:0 1 auto;min-height:0;display:flex;flex-direction:column}
+  .recent .hd{display:flex;align-items:baseline;justify-content:space-between;margin:0 18px 12px}
   .recent h2{margin:0;font:400 23px/1.2 var(--serif)}
-  ul#list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+  ul#list{list-style:none;margin:0;padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+  ul#list:empty{display:none}
+  ul#list > li{flex:none} /* le righe tengono la loro altezza: scorre l'elenco */
 
   /* riga con swipe per eliminare */
   .row{position:relative;border-radius:12px;overflow:hidden;touch-action:pan-y}
@@ -102,6 +106,29 @@
   .row .st i{width:6px;height:6px;border-radius:50%;background:var(--accent)}
   .row .st.go i{animation:pulse 1s ease-in-out infinite}
   .row .st.err i{background:var(--muted)}
+  /* tenere premuto: niente menu del browser né selezione del testo */
+  .row{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+  /* selezione multipla */
+  .row.sel .fg{background:var(--row-on);box-shadow:inset 0 0 0 1.5px var(--accent)}
+  .row .ic .ck{display:none;width:20px;height:20px;border-radius:50%;border:1.5px solid var(--muted);place-items:center;color:#fff}
+  .row .ic .ck svg{width:12px;height:12px;stroke-width:3}
+  body.scegli .row .ic > svg{display:none}
+  body.scegli .row .ic .ck{display:grid}
+  .row.sel .ic .ck{background:var(--viola-pieno);border-color:var(--viola-pieno)}
+  .row.sel .ic .ck svg{visibility:visible}
+  .row .ic .ck svg{visibility:hidden}
+  #selbar{width:min(360px,calc(100vw - 32px));padding:0 7px;gap:10px;justify-content:space-between}
+  #selbar .n{font-size:14px;color:rgba(255,255,255,.85);flex:1;text-align:center}
+  #unisci{height:44px;border:0;border-radius:999px;background:#fff;color:#111;font-size:14px;font-weight:600;padding:0 18px;flex:none}
+  #unisci:disabled{opacity:.4}
+  /* il pensiero unito: l'elenco di cosa contiene */
+  .contiene{margin-top:16px}
+  .contiene .cap{margin:0 2px 8px;display:block}
+  .contiene button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:var(--row);border-radius:10px;padding:10px 12px;margin-top:6px;text-align:left;color:var(--ink);font-size:13.5px}
+  .contiene button svg{width:16px;height:16px;color:var(--muted)}
+  .contiene button span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .contiene button small{color:var(--muted);font-size:12px}
+  .ghost.sep{color:var(--accent);font-size:15px;font-weight:500}
   @keyframes pulse{50%{opacity:.15}}
 
   .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:34px 18px 30px}
@@ -215,6 +242,9 @@
   <symbol id="i-laptop" viewBox="0 0 24 24"><path d="M20 16V7a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9m16 0H4m16 0 1.28 2.55A1 1 0 0 1 20.38 20H3.62a1 1 0 0 1-.9-1.45L4 16"/></symbol>
   <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3"/></symbol>
   <symbol id="i-doc" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8M16 13H8M16 17H8"/></symbol>
+  <symbol id="i-voce" viewBox="0 0 24 24"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M9 10.5v3M12 9v6M15 10.5v3"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
   <symbol id="i-text" viewBox="0 0 24 24"><path d="M17 6.1H3M21 12.1H3M15.1 18H3"/></symbol>
   <symbol id="i-brain" viewBox="0 0 24 24"><path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M12 5v13"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l13-7.5z"/></symbol>
@@ -242,7 +272,7 @@
       </div>
     </div>
     <div class="recent">
-      <div class="hd"><h2>Ultimi pensieri</h2><span class="cap">dal telefono</span></div>
+      <div class="hd"><h2>Ultimi pensieri</h2></div>
       <ul id="list"></ul>
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
@@ -255,6 +285,11 @@
 
 <div id="dock" hidden>
   <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
+  <div id="selbar" class="capsule" hidden>
+    <button class="x" id="selno" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
+    <span class="n" id="seln">Scegli i pensieri</span>
+    <button id="unisci" type="button" disabled>Unisci</button>
+  </div>
   <div id="live" class="capsule" hidden>
     <button class="x" id="annulla" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
     <span class="rdot"></span>
@@ -269,6 +304,7 @@
   <div class="bk">
     <button class="ghost" type="button" data-a="back"><svg class="i"><use href="#i-back"/></svg>Pensieri</button>
     <button class="ghost red" type="button" data-a="del"><svg class="i"><use href="#i-trash"/></svg></button>
+    <button class="ghost sep" type="button" data-a="sep" hidden>Separa</button>
   </div>
   <div class="dcard">
     <h3 data-d="title"></h3>
@@ -280,6 +316,7 @@
       <div class="track"><i></i></div>
       <span data-d="time">0:00</span>
     </div>
+    <div class="contiene" data-d="contiene" hidden></div>
     <div data-d="sb" hidden><span class="sb"><svg class="i" style="width:14px;height:14px"><use href="#i-brain"/></svg>Nel Second Brain</span></div>
   </div>
 </div></div>
@@ -363,6 +400,8 @@ if (typeof module !== 'undefined') module.exports = sistemaWebm;
 // e la scheda li elenca in "parti"; il Mac li rimette insieme prima di trascrivere.
 // Una trascrizione già pronta (il registratore del telefono la sa fare) va in pensieri/<id>.txt e la scheda la indica in
 // "trascrizione" invece di "audio": il Mac non trascrive, la usa così com'è (e ne fa il verbale).
+// Più pensieri uniti: una scheda nuova senza audio con "unisce": [id, …] (in ordine di tempo). Il Mac mette in fila i testi
+// e scrive un verbale unico; gli originali restano dove sono ma l'elenco li nasconde. "Separa" elimina solo la scheda unita.
 window.SP = (() => {
   const CFG_KEY = 'sp-gh';
   let cfg = null;
@@ -638,23 +677,46 @@ window.SP = (() => {
     for (const f of faces) { const ff = new FontFace(f.family, f.buf, {weight: f.weight || '400', style: f.style || 'normal', display: 'swap'}); await ff.load(); document.fonts.add(ff); }
   }
 
+  /* ---------- unire più pensieri ---------- */
+  async function unisci(ids) {
+    if (!cfg) throw fail('offline');
+    const tutti_ = tutti(), scelti = ids.map(id => tutti_.find(p => p.id === id)).filter(Boolean);
+    if (scelti.some(p => locali.some(l => l.id === p.id))) throw fail('locale');
+    scelti.sort((a, b) => (a.creato || '').localeCompare(b.creato || ''));
+    const d = new Date(), pad = n => String(n).padStart(2, '0');
+    const id = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
+    // la data è quella del primo pensiero: il pensiero unito sta nell'elenco dove stavano loro
+    const meta = {id, creato: scelti[0].creato || d.toISOString(), durata: scelti.reduce((a, p) => a + (p.durata || 0), 0),
+      unisce: scelti.map(p => p.id), unitoIl: d.toISOString(), da: 'telefono'};
+    await create(`pensieri/${id}.json`, b64json(meta), `unione: ${id}`);
+    st.remoti[id] = Object.assign(meta, {_sha: 'locale'}); await set('st', st);
+    emit();
+    return id;
+  }
+
   /* ---------- la lista che vede l'app ---------- */
   // il Mac scriverà il verbale (stessa regola di Pensieri.swift): file condivisi o registrazioni lunghe, con un po' di testo
   function verbaleAtteso(m, t) {
     if (!t || !t.testo || t.riscritto || (t.verbaleTentativi || 0) >= 3) return false;
     const parole = t.testo.trim().split(/\s+/).length;
-    return (!!(m.importato || m.trascrizione) && parole >= 80) || (m.durata || 0) >= 600 || parole >= 1200;
+    return (!!(m.importato || m.trascrizione || m.unisce) && parole >= 80) || (m.durata || 0) >= 600 || parole >= 1200;
   }
-  function pensieri() {
+  // tutti, anche quelli dentro un pensiero unito (si aprono da lì)
+  function tutti() {
     const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato, progresso: l.progresso, nomeFile: l.nome, soloTesto: l.ext === 'txt', importato: !!l.nome}));
     for (const [id, m] of Object.entries(st.remoti)) {
       if (locali.some(l => l.id === id)) continue;
       const t = st.testi[id];
       out.push(Object.assign({id, creato: m.creato, durata: m.durata, nomeFile: m.nomeFile, soloTesto: !!m.trascrizione, importato: !!m.importato,
-        verbaleAtteso: verbaleAtteso(m, t), stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
+        unisce: Array.isArray(m.unisce) ? m.unisce : null, verbaleAtteso: verbaleAtteso(m, t), stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
         testo: t.testo, titolo: t.titolo, riscritto: t.riscritto, verbale: t.tipoRiscritto === 'verbale', errore: t.errore, secondBrain: t.secondBrain} : {}));
     }
     return out.sort((a, b) => (b.creato || '').localeCompare(a.creato || ''));
+  }
+  // l'elenco: senza i pensieri che stanno dentro un pensiero unito
+  function pensieri() {
+    const t = tutti(), dentro = new Set(t.flatMap(p => p.unisce || []));
+    return t.filter(p => !dentro.has(p.id));
   }
 
   /* ---------- avvio ---------- */
@@ -681,7 +743,7 @@ window.SP = (() => {
   }
   function forget() { localStorage.removeItem(CFG_KEY); }
 
-  return {CFG_KEY, start, pull, flush, aggiungi, aggiungiTesto, eTesto, importaCondivisi, elimina, audio, pensieri, forget, bozza, bozzaVia, on: f => (listeners.add(f), () => listeners.delete(f)),
+  return {CFG_KEY, start, pull, flush, aggiungi, aggiungiTesto, eTesto, importaCondivisi, unisci, elimina, tutti, audio, pensieri, forget, bozza, bozzaVia, on: f => (listeners.add(f), () => listeners.delete(f)),
     get offline() { return !navigator.onLine; }};
 })();
 </script>
@@ -869,7 +931,8 @@ window.SP_LOCK = (() => {
   let toastT;
   const toast = t => { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2600); };
 
-  const titolo = p => p.titolo || (p.testo ? p.testo.trim().split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:!?]+$/, '') + (p.testo.trim().split(/\s+/).length > 7 ? '…' : '') : 'Pensiero ' + (quando(p.creato).toLowerCase()));
+  const dettaglioRiga = p => p.unisce ? `${p.unisce.length} pensieri uniti` : p.soloTesto ? 'trascrizione' : mmss(p.durata);
+  const titolo = p => p.titolo || (p.unisce && !p.testo ? `${p.unisce.length} pensieri uniti` : '') || (p.testo ? p.testo.trim().split(/\s+/).slice(0, 7).join(' ').replace(/[.,;:!?]+$/, '') + (p.testo.trim().split(/\s+/).length > 7 ? '…' : '') : 'Pensiero ' + (quando(p.creato).toLowerCase()));
   const STATI = {
     coda: ['In coda · parte appena c\'è rete', 'up', false],
     invio: ['Invio…', 'up', true],
@@ -879,11 +942,13 @@ window.SP_LOCK = (() => {
   // una trascrizione già fatta dal registratore: il Mac non la trascrive, la copia (e poi ne scrive il verbale)
   const STATO_TESTO = 'Il Mac sta copiando la trascrizione';
   // l'icona dice a che punto è (in viaggio, al Mac) e, quando è pronto, che cos'è:
-  // una voce registrata qui (microfono), un audio condiviso (onda), una trascrizione condivisa (foglio)
+  // una voce registrata qui (nuvoletta con il parlato), un audio condiviso (onda), una trascrizione condivisa (foglio)
+  // (più pensieri uniti: i fogli uno sopra l'altro)
   const icona = p => p.secondBrain ? 'brain' : p.stato !== 'pronto' ? (STATI[p.stato] || STATI.attesa)[1]
-    : p.soloTesto ? 'doc' : p.importato ? 'wave' : 'mic';
+    : p.unisce ? 'layers' : p.soloTesto ? 'doc' : p.importato ? 'wave' : 'voce';
+  const STATO_UNIONE = 'Il Mac sta unendo i pensieri';
   // cosa sta facendo il Mac, e cosa comparirà
-  const attesa = p => p.soloTesto ? [STATO_TESTO, 'Poi qui comparirà il verbale.']
+  const attesa = p => p.unisce ? [STATO_UNIONE, 'Qui compariranno il verbale e tutti i testi.'] : p.soloTesto ? [STATO_TESTO, 'Poi qui comparirà il verbale.']
     : [(STATI[p.stato] || STATI.attesa)[0], p.importato || p.durata >= 600 ? 'Qui compariranno il verbale e la trascrizione.' : 'La trascrizione comparirà qui.'];
 
   /* ---------- lista ---------- */
@@ -901,14 +966,16 @@ window.SP_LOCK = (() => {
       let [stTxt, stIco, busy] = STATI[p.stato] || STATI.attesa;
       if (p.stato === 'invio' && p.progresso) stTxt = `Invio… parte ${p.progresso}`;
       if (p.stato === 'attesa' && p.soloTesto) stTxt = STATO_TESTO;
+      if (p.stato === 'attesa' && p.unisce) stTxt = STATO_UNIONE;
       const html = `<button class="del" type="button" aria-label="Elimina">${ico('trash')}</button>
-        <div class="fg"><div class="ic">${ico(icona(p))}</div><div class="tx">
-        <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${p.soloTesto ? 'trascrizione' : mmss(p.durata)}</div>
+        <div class="fg"><div class="ic">${ico(icona(p))}<span class="ck">${ico('check')}</span></div><div class="tx">
+        <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${dettaglioRiga(p)}</div>
         ${p.testo ? `<div class="b">${esc(p.riscritto || p.testo)}</div>` : p.stato === 'pronto' ? `<div class="st err"><i></i>${esc(p.errore || 'Nessuna parola riconosciuta')}</div>` : `<div class="st${busy ? ' go' : ''}"><i></i>${stTxt}</div>`}
         </div></div>`;
       let li = keep.get(p.id);
       if (!li) { li = document.createElement('li'); li.className = 'row'; li.dataset.id = p.id; swipe(li); }
       if (li._html !== html) { li.innerHTML = html; li._html = html; li._x = 0; }
+      li.classList.toggle('sel', !!scelti && scelti.has(p.id));
       keep.delete(p.id); frag.appendChild(li);
     }
     ul.replaceChildren(frag);
@@ -916,21 +983,27 @@ window.SP_LOCK = (() => {
   }
 
   function swipe(li) {
-    let x0 = 0, y0 = 0, dx = 0, on = false, moved = false;
+    let x0 = 0, y0 = 0, dx = 0, on = false, moved = false, premuto = 0, lungo = false;
+    li.addEventListener('contextmenu', e => e.preventDefault());
     const fg = () => li.querySelector('.fg');
     const setX = x => { li._x = x; li.classList.toggle('sw', x !== 0); fg().style.transform = x ? `translateX(${x}px)` : ''; };
     li.addEventListener('pointerdown', e => {
       if (e.target.closest('.del')) return;
-      x0 = e.clientX; y0 = e.clientY; dx = 0; on = true; moved = false;
+      x0 = e.clientX; y0 = e.clientY; dx = 0; on = true; moved = false; lungo = false;
+      clearTimeout(premuto);
+      if (!scelti) premuto = setTimeout(() => { if (on && !moved) { lungo = true; on = false; avviaSelezione(li.dataset.id); } }, 450);
     });
     li.addEventListener('pointermove', e => {
       if (!on) return;
       const mx = e.clientX - x0, my = e.clientY - y0;
+      if (Math.abs(mx) > 8 || Math.abs(my) > 8) clearTimeout(premuto);
+      if (scelti) return;
       if (!moved && Math.abs(mx) > 8 && Math.abs(mx) > Math.abs(my)) { moved = true; li.classList.add('drag'); li.setPointerCapture(e.pointerId); }
       if (!moved) return;
       dx = mx; setX(Math.max(-96, Math.min(0, (openRow === li ? -72 : 0) + dx)));
     });
     const end = () => {
+      clearTimeout(premuto);
       if (!on) return; on = false; li.classList.remove('drag');
       if (!moved) return;
       const open = li._x < -36; setX(open ? -72 : 0);
@@ -939,17 +1012,62 @@ window.SP_LOCK = (() => {
     };
     li.addEventListener('pointerup', end); li.addEventListener('pointercancel', end);
     li.addEventListener('click', e => {
+      if (lungo) { lungo = false; return; }
+      if (scelti) return scegli(li.dataset.id);
       if (moved) { moved = false; return; }
       if (e.target.closest('.del')) return chiediElimina(li.dataset.id);
       if (openRow) return closeRow();
       openDetail(li.dataset.id);
     });
   }
+  /* ---------- selezione multipla: tieni premuto un pensiero, poi tocca gli altri e Unisci ---------- */
+  let scelti = null;
+  function avviaSelezione(id) {
+    closeRow();
+    scelti = new Set([id]);
+    if (navigator.vibrate) navigator.vibrate(15);
+    document.body.classList.add('scegli');
+    $('#rec').hidden = true; $('#selbar').hidden = false;
+    history.pushState({sel: 1}, '');
+    aggiornaSelezione();
+  }
+  function scegli(id) {
+    scelti.has(id) ? scelti.delete(id) : scelti.add(id);
+    if (navigator.vibrate) navigator.vibrate(8);
+    aggiornaSelezione();
+  }
+  function aggiornaSelezione() {
+    const n = scelti ? scelti.size : 0;
+    $('#seln').textContent = n < 2 ? 'Scegli almeno 2 pensieri' : `${n} pensieri scelti`;
+    $('#unisci').disabled = n < 2;
+    document.querySelectorAll('#list li').forEach(li => li.classList.toggle('sel', !!scelti && scelti.has(li.dataset.id)));
+  }
+  function esciSelezione() {
+    if (!scelti) return;
+    scelti = null;
+    document.body.classList.remove('scegli');
+    $('#selbar').hidden = true; $('#rec').hidden = false;
+    aggiornaSelezione();
+  }
+  $('#selno').addEventListener('click', () => history.back());
+  $('#unisci').addEventListener('click', async () => {
+    if (!scelti || scelti.size < 2) return;
+    const b = $('#unisci'); b.disabled = true; b.textContent = 'Unisco…';
+    try {
+      await SP.unisci([...scelti]);
+      history.back();
+      suona('inviato'); toast('Uniti · il Mac scrive il verbale');
+    } catch (e) {
+      toast(e.code === 'locale' ? 'Aspetta che siano tutti inviati al Mac' : e.code === 'offline' ? 'Serve la rete per unirli' : 'Non sono riuscito a unirli');
+      b.disabled = false;
+    } finally { b.textContent = 'Unisci'; }
+  });
+
   function closeRow() { if (!openRow) return; const f = openRow.querySelector('.fg'); f.style.transform = ''; openRow._x = 0; openRow.classList.remove('sw'); openRow = null; }
 
   /* ---------- eliminare, con conferma ---------- */
   function chiediElimina(id) {
-    const p = SP.pensieri().find(x => x.id === id); if (!p) return;
+    const p = SP.tutti().find(x => x.id === id); if (!p) return;
     const el = document.createElement('div'); el.id = 'ask';
     el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Eliminare questo pensiero?</h4>
       <p>“${esc(titolo(p))}” verrà eliminato definitivamente, dal telefono e dal Mac, insieme all'audio e alla trascrizione.</p>
@@ -970,11 +1088,17 @@ window.SP_LOCK = (() => {
   function openDetail(id) { cur = id; tab = null; player.pause(); player.removeAttribute('src'); $('#detail .track i').style.transform = 'translateX(-100%)'; syncPlay(); showDetail(id); $('#detail').classList.add('on'); $('#detail').setAttribute('aria-hidden', 'false'); history.pushState({d: id}, ''); }
   function hideDetail() { cur = null; player.pause(); $('#detail').classList.remove('on'); $('#detail').setAttribute('aria-hidden', 'true'); }
   function showDetail(id, refresh) {
-    const p = SP.pensieri().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
+    const p = SP.tutti().find(x => x.id === id); if (!p) { if (refresh) hideDetail(); return; }
     const d = q => $('#detail [data-d=' + q + ']');
     d('title').textContent = titolo(p);
-    d('when').textContent = `${quando(p.creato)} · ${p.soloTesto ? 'trascrizione importata' : mmss(p.durata)}`;
-    $('#detail .player').hidden = !!p.soloTesto;
+    d('when').textContent = `${quando(p.creato)} · ${p.unisce ? dettaglioRiga(p) : p.soloTesto ? 'trascrizione importata' : mmss(p.durata)}`;
+    $('#detail .player').hidden = !!(p.soloTesto || p.unisce);
+    // un pensiero unito non si elimina: si separa (gli originali tornano nell'elenco)
+    $('#detail [data-a=del]').hidden = !!p.unisce; $('#detail [data-a=sep]').hidden = !p.unisce;
+    const tutti = SP.tutti(), dentro = (p.unisce || []).map(x => tutti.find(q => q.id === x)).filter(Boolean);
+    d('contiene').hidden = !dentro.length;
+    d('contiene').innerHTML = dentro.length ? '<span class="cap">Contiene</span>' + dentro.map(q =>
+      `<button type="button" data-id="${esc(q.id)}">${ico(icona(q))}<span>${esc(titolo(q))}</span><small>${esc(quando(q.creato))}</small></button>`).join('') : '';
     // il verbale (anche quello in arrivo) viene prima ed è aperto; la riscrittura di un pensiero resta dopo la trascrizione
     const conVerbale = p.verbale || p.verbaleAtteso;
     const ordine = conVerbale ? [['r', 'Verbale'], ['t', 'Trascrizione']] : [['t', 'Trascrizione'], ['r', 'Riscritta']];
@@ -999,7 +1123,30 @@ window.SP_LOCK = (() => {
   $('#detail [data-d=seg]').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; tab = b.dataset.t; showDetail(cur); });
   $('#detail [data-a=back]').addEventListener('click', () => history.back());
   $('#detail [data-a=del]').addEventListener('click', () => cur && chiediElimina(cur));
-  addEventListener('popstate', () => { if (cur) hideDetail(); });
+  // indietro: da un pensiero aperto dentro un unito si torna all'unito; altrimenti all'elenco (ed esce dalla selezione)
+  addEventListener('popstate', () => {
+    const st = history.state;
+    if (scelti && !(st && st.sel)) esciSelezione();
+    if (cur && st && st.d && st.d !== cur) { cur = st.d; tab = null; player.pause(); player.removeAttribute('src'); syncPlay(); showDetail(cur); return; }
+    if (cur) hideDetail();
+  });
+  // all'avvio la cronologia parte pulita: uno stato rimasto da prima (una ricarica) non deve riaprire niente
+  history.replaceState(null, '', location.pathname + location.search);
+  $('#detail [data-d=contiene]').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (b) openDetail(b.dataset.id); });
+  $('#detail [data-a=sep]').addEventListener('click', () => {
+    const p = cur && SP.tutti().find(x => x.id === cur); if (!p) return;
+    const el = document.createElement('div'); el.id = 'ask';
+    el.innerHTML = `<div class="m" role="dialog" aria-modal="true"><h4>Separare questi pensieri?</h4>
+      <p>I ${p.unisce.length} pensieri torneranno separati nell'elenco, ognuno con il suo testo. Il verbale unito verrà eliminato.</p>
+      <div class="bt"><button class="btn" type="button" data-a="no">Annulla</button><button class="btn dark" type="button" data-a="si">Separa</button></div></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click', e => { if (e.target === el || e.target.closest('[data-a=no]')) el.remove(); });
+    el.querySelector('[data-a=si]').addEventListener('click', async () => {
+      const b = el.querySelector('[data-a=si]'); b.disabled = true; b.textContent = 'Separo…';
+      try { await SP.elimina(p.id); el.remove(); history.back(); toast('Pensieri separati'); }
+      catch (e) { el.remove(); toast(e.code === 'offline' ? 'Serve la rete per separarli' : 'Non sono riuscito a separarli'); }
+    });
+  });
   const playBtn = $('#detail [data-a=play]'), fill = $('#detail .track i');
   playBtn.addEventListener('click', async () => {
     if (!player.paused) return player.pause();
