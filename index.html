@@ -867,6 +867,8 @@ window.SP_LOCK = (() => {
     attesa: ['Inviato · il Mac lo trascrive', 'laptop', false],
     pronto: ['', 'text', false],
   };
+  // una trascrizione già fatta dal registratore: il Mac non la trascrive, la copia (e poi ne scrive il verbale)
+  const STATO_TESTO = 'Inviato · il Mac la sta copiando';
 
   /* ---------- lista ---------- */
   let openRow = null;
@@ -882,7 +884,7 @@ window.SP_LOCK = (() => {
     for (const p of ps) {
       let [stTxt, stIco, busy] = STATI[p.stato] || STATI.attesa;
       if (p.stato === 'invio' && p.progresso) stTxt = `Invio… parte ${p.progresso}`;
-      if (p.stato === 'attesa' && p.soloTesto) stTxt = 'Inviato · il Mac scrive il verbale';
+      if (p.stato === 'attesa' && p.soloTesto) stTxt = STATO_TESTO;
       const html = `<button class="del" type="button" aria-label="Elimina">${ico('trash')}</button>
         <div class="fg"><div class="ic">${ico(p.secondBrain ? 'brain' : stIco)}</div><div class="tx">
         <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${p.soloTesto ? 'trascrizione' : mmss(p.durata)}</div>
@@ -963,7 +965,12 @@ window.SP_LOCK = (() => {
     const t = d('text');
     if (p.testo) { t.className = 'text'; t.textContent = tab && p.riscritto ? p.riscritto : p.testo; }
     else if (p.stato === 'pronto') { t.className = 'text wait'; t.textContent = p.errore ? p.errore + '. L\'audio è qui sotto.' : 'Nessuna parola riconosciuta. L\'audio è qui sotto.'; }
-    else { t.className = 'text wait'; t.innerHTML = ico((STATI[p.stato] || STATI.attesa)[1]) + esc((STATI[p.stato] || STATI.attesa)[0]) + '. La trascrizione comparirà qui.'; }
+    else {
+      // due righe: cosa sta succedendo, poi dove comparirà il testo
+      const [riga, icona] = STATI[p.stato] || STATI.attesa;
+      t.className = 'text wait';
+      t.innerHTML = ico(icona) + `<span>${esc(p.stato === 'attesa' && p.soloTesto ? STATO_TESTO : riga)}<br>La trascrizione comparirà qui.</span>`;
+    }
     d('sb').hidden = !p.secondBrain;
     if (!refresh) d('time').textContent = mmss(p.durata);
   }
