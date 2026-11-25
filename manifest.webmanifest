@@ -9,6 +9,36 @@
  "orientation": "portrait",
  "background_color": "#170937",
  "lang": "it",
+ "share_target": {
+  "action": "./condividi",
+  "method": "POST",
+  "enctype": "multipart/form-data",
+  "params": {
+   "title": "title",
+   "text": "text",
+   "files": [
+    {
+     "name": "audio",
+     "accept": [
+      "audio/*",
+      ".m4a",
+      ".mp3",
+      ".wav",
+      ".ogg",
+      ".oga",
+      ".opus",
+      ".aac",
+      ".amr",
+      ".3gp",
+      ".flac",
+      ".webm",
+      "text/plain",
+      ".txt"
+     ]
+    }
+   ]
+  }
+ },
  "icons": [
   {
    "src": "icon-192.png?v=9",
