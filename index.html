@@ -110,13 +110,17 @@
   .empty p{margin:0;font-size:13px;color:var(--muted);max-width:270px}
 
   /* ---------- il pulsante in basso: capsula nera come il notch ---------- */
-  #dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;padding:14px 16px calc(16px + var(--safe-b));pointer-events:none;
+  #dock{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:center;gap:10px;padding:14px 16px calc(16px + var(--safe-b));pointer-events:none;
     background:linear-gradient(to top,var(--canvas) 55%,transparent)}
   .capsule{pointer-events:auto;height:58px;border-radius:999px;background:var(--capsule);color:#fff;display:flex;align-items:center;box-shadow:0 10px 30px rgba(0,0,0,.18),0 1px 0 rgba(255,255,255,.06) inset;
     transition:width .32s cubic-bezier(.2,.9,.25,1)}
   #rec{width:168px;border:0;justify-content:center;gap:9px;font-size:15px;font-weight:500}
   #rec svg{width:19px;height:19px}
   #rec:active{transform:scale(.98)}
+  /* importa un audio registrato con un'altra app (una riunione, un vocale) */
+  #imp{width:58px;border:0;justify-content:center}
+  #imp svg{width:19px;height:19px}
+  #imp:active{transform:scale(.96)}
   #live{width:min(360px,calc(100vw - 32px));padding:0 7px 0 7px;gap:10px}
   #pausa{width:44px;height:44px} /* grande come il tasto Fine */
   #pausa svg{width:17px;height:17px;fill:currentColor;stroke:none}
@@ -245,7 +249,7 @@
       <div class="empty" id="empty" hidden>
         <svg class="i"><use href="#i-spell"/></svg>
         <b>Le tue idee, in un posto solo.</b>
-        <p>Premi Registra e parla. Il Mac trascrive ogni pensiero e te lo rimanda qui.</p>
+        <p>Premi Registra e parla, oppure importa un audio con la freccia. Il Mac lo trascrive e te lo rimanda qui.</p>
       </div>
     </div>
   </section>
@@ -253,6 +257,8 @@
 
 <div id="dock" hidden>
   <button id="rec" class="capsule" type="button"><svg class="i"><use href="#i-mic"/></svg>Registra</button>
+  <button id="imp" class="capsule" type="button" aria-label="Importa un audio"><svg class="i"><use href="#i-up"/></svg></button>
+  <input id="file" type="file" accept="audio/*,.m4a,.mp3,.wav,.ogg,.oga,.opus,.aac,.amr,.3gp,.webm,.flac" hidden>
   <div id="live" class="capsule" hidden>
     <button class="x" id="annulla" type="button" aria-label="Annulla"><svg class="i"><use href="#i-x"/></svg></button>
     <span class="rdot"></span>
@@ -271,7 +277,7 @@
   <div class="dcard">
     <h3 data-d="title"></h3>
     <div class="when" data-d="when"></div>
-    <div class="seg" data-d="seg" hidden><button type="button" data-t="0" class="on">Trascrizione</button><button type="button" data-t="1">Riscritta</button></div>
+    <div class="seg" data-d="seg" hidden><button type="button" data-t="0" class="on">Trascrizione</button><button type="button" data-t="1" data-d="seg1">Riscritta</button></div>
     <div class="text" data-d="text"></div>
     <div class="player">
       <button class="play" type="button" data-a="play"><svg class="i"><use href="#i-play"/></svg></button>
@@ -357,6 +363,8 @@ if (typeof module !== 'undefined') module.exports = sistemaWebm;
 // Il telefono scrive solo pensieri/<id>.<audio> e pensieri/<id>.json (un file nuovo per pensiero, mai riscritto).
 // Il Mac scrive testi/<id>.json (trascrizione, titolo, versione riscritta). Così telefono e Mac non si pestano i piedi.
 // Ogni registrazione resta prima in IndexedDB: se manca la rete parte appena torna.
+// Un audio grande (una riunione registrata o importata) parte a pezzi da 4 MB: pensieri/<id>.parte-001.<ext>, …
+// e la scheda li elenca in "parti"; il Mac li rimette insieme prima di trascrivere.
 window.SP = (() => {
   const CFG_KEY = 'sp-gh';
   let cfg = null;
@@ -376,6 +384,9 @@ window.SP = (() => {
   const get = k => idb('readonly', s => s.get(k)).catch(() => undefined);
   const set = (k, v) => idb('readwrite', s => s.put(v, k)).catch(() => {});
   const del = k => idb('readwrite', s => s.delete(k)).catch(() => {});
+  const fascia = pre => IDBKeyRange.bound(pre, pre + '\uffff');
+  const getAll = pre => idb('readonly', s => s.getAll(fascia(pre))).catch(() => []);
+  const delAll = pre => idb('readwrite', s => s.delete(fascia(pre))).catch(() => {});
 
   /* ---------- GitHub ---------- */
   const fail = (code, status) => Object.assign(new Error(code), {code, status});
@@ -454,6 +465,22 @@ window.SP = (() => {
   }
 
   /* ---------- invio ---------- */
+  const PARTE = 4 * 1024 * 1024; // GitHub accetta file grandi, ma un invio piccolo regge meglio una rete che va e viene
+  const pad3 = n => String(n).padStart(3, '0');
+  const nomiParti = (l, size) => size <= PARTE ? null : Array.from({length: Math.ceil(size / PARTE)}, (_, i) => `${l.id}.parte-${pad3(i + 1)}.${l.ext}`);
+  // un audio, intero o a pezzi; i pezzi già arrivati (un invio interrotto) non ripartono
+  async function inviaAudio(l, blob) {
+    const parti = nomiParti(l, blob.size);
+    if (!parti) { await create(`pensieri/${l.id}.${l.ext}`, await b64blob(blob), `pensiero: audio ${l.id}`); return null; }
+    const ci = (await albero()).pensieri;
+    for (let i = 0; i < parti.length; i++) {
+      l.progresso = `${i + 1} di ${parti.length}`; emit();
+      if (ci[parti[i]]) continue;
+      await create(`pensieri/${parti[i]}`, await b64blob(blob.slice(i * PARTE, (i + 1) * PARTE)), `pensiero: audio ${l.id} (${i + 1}/${parti.length})`);
+    }
+    delete l.progresso;
+    return parti;
+  }
   let flushing = false;
   async function flush() {
     if (flushing || !cfg) return;
@@ -464,15 +491,17 @@ window.SP = (() => {
         if (!blob) { locali = locali.filter(x => x !== l); await saveLocali(); continue; }
         l.stato = 'invio'; emit();
         const meta = {id: l.id, creato: l.creato, durata: l.durata, mime: l.mime, audio: `${l.id}.${l.ext}`, da: 'telefono'};
+        if (l.nome) Object.assign(meta, {importato: true, nomeFile: l.nome});
         try {
           // prima l'audio, poi la scheda: il Mac considera un pensiero solo quando c'è la scheda
-          await create(`pensieri/${meta.audio}`, await b64blob(blob), `pensiero: audio ${l.id}`);
+          const parti = await inviaAudio(l, blob);
+          if (parti) meta.parti = parti;
           await create(`pensieri/${l.id}.json`, b64json(meta), `pensiero: ${l.id}`);
           locali = locali.filter(x => x !== l); await saveLocali();
           st.remoti[l.id] = Object.assign(meta, {_sha: 'locale'}); await set('st', st);
           emit();
         } catch (e) {
-          l.stato = 'coda'; emit();
+          l.stato = 'coda'; delete l.progresso; emit();
           if (e.code === 'auth') { fatal(e); return; }
           return; // offline o GitHub non risponde: riprovo al prossimo giro
         }
@@ -490,25 +519,36 @@ window.SP = (() => {
     } catch (e) { return blob; }
   }
 
-  async function aggiungi(blob, durata, mime, creato) {
+  // estensione: quella del file importato se è un audio che ffmpeg conosce, altrimenti dal tipo
+  const ESTENSIONI = ['m4a', 'mp4', 'aac', 'mp3', 'wav', 'ogg', 'oga', 'opus', 'webm', 'amr', '3gp', 'flac', 'caf', 'aiff'];
+  function estensione(mime, nome) {
+    const dalNome = nome && /\.([a-z0-9]{2,5})$/i.exec(nome);
+    if (dalNome && ESTENSIONI.includes(dalNome[1].toLowerCase())) return dalNome[1].toLowerCase();
+    return /mpeg|mp3/.test(mime) ? 'mp3' : /wav/.test(mime) ? 'wav' : /amr/.test(mime) ? 'amr' : /3gpp/.test(mime) ? '3gp' : /flac/.test(mime) ? 'flac'
+      : /mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg|opus/.test(mime) ? 'ogg' : 'webm';
+  }
+
+  async function aggiungi(blob, durata, mime, creato, nome) {
     const d = creato ? new Date(creato) : new Date(), p = n => String(n).padStart(2, '0');
     const id = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${Math.random().toString(36).slice(2, 6)}`;
-    const ext = /mp4|aac|m4a/.test(mime) ? 'm4a' : /ogg/.test(mime) ? 'ogg' : 'webm';
+    const ext = estensione(mime || blob.type || '', nome);
     if (ext === 'webm') blob = await ripara(blob); // tempi in fila (vedi webm.js)
     await set('audio:' + id, blob);
-    locali.unshift({id, creato: d.toISOString(), durata: Math.round(durata * 10) / 10, mime: mime || blob.type || 'audio/webm', ext, stato: 'coda'});
+    locali.unshift(Object.assign({id, creato: d.toISOString(), durata: Math.round(durata * 10) / 10, mime: mime || blob.type || 'audio/webm', ext, stato: 'coda'}, nome ? {nome} : {}));
     await saveLocali(); emit();
     flush();
     return id;
   }
 
   /* ---------- la registrazione in corso, salvata ogni secondo ---------- */
-  // se il telefono chiude l'app o si spegne mentre parli, alla riapertura il pensiero non è perso
-  const bozza = (info, chunks) => set('bozza', {info, chunks});
-  const bozzaVia = () => del('bozza');
+  // se il telefono chiude l'app o si spegne mentre parli, alla riapertura il pensiero non è perso.
+  // Ogni secondo si aggiunge solo il pezzo nuovo (bozza:c:<n>): anche dopo due ore non si riscrive tutto.
+  const bozza = (info, chunk, n) => Promise.all([set('bozza:info', info), set('bozza:c:' + String(n).padStart(6, '0'), chunk)]);
+  const bozzaVia = () => Promise.all([del('bozza'), delAll('bozza:')]);
   async function recuperaBozza() {
-    const b = await get('bozza');
-    if (!b || !b.chunks || !b.chunks.length) return false;
+    const vecchia = await get('bozza'); // versione precedente: tutti i pezzi in una chiave
+    const b = vecchia && vecchia.chunks ? vecchia : {info: await get('bozza:info'), chunks: await getAll('bozza:c:')};
+    if (!b.info || !b.chunks || !b.chunks.length) { await bozzaVia(); return false; }
     await bozzaVia();
     const blob = new Blob(b.chunks, {type: b.info.mime || b.chunks[0].type || 'audio/webm'});
     if (b.info.durata < 1) return false;
@@ -528,7 +568,7 @@ window.SP = (() => {
         // chiedo la lista aggiornata, così ho gli sha veri anche di quello che ho appena inviato
         const {pensieri: pens, testi: tes} = await albero();
         if (tes[id + '.json']) await remove(`testi/${id}.json`, tes[id + '.json'], `elimina testo ${id}`);
-        for (const [nome, sha] of Object.entries(pens)) if (nome.replace(/\.[^.]+$/, '') === id && !nome.endsWith('.json')) await remove(`pensieri/${nome}`, sha, `elimina audio ${id}`);
+        for (const [nome, sha] of Object.entries(pens)) if ((nome.replace(/\.[^.]+$/, '') === id || nome.startsWith(id + '.parte-')) && !nome.endsWith('.json')) await remove(`pensieri/${nome}`, sha, `elimina audio ${id}`);
         if (pens[id + '.json']) await remove(`pensieri/${id}.json`, pens[id + '.json'], `elimina ${id}`);
         delete st.remoti[id]; delete st.testi[id]; await set('st', st);
       }
@@ -545,8 +585,12 @@ window.SP = (() => {
     let blob = await get('audio:' + id);
     if (!blob) {
       const m = st.remoti[id]; if (!m) return null;
-      const r = await raw('pensieri/' + (m.audio || (m._audio && m._audio.nome))); if (!r.ok) return null;
-      blob = await r.blob(); set('audio:' + id, blob);
+      const pezzi = [];
+      for (const nome of m.parti || [m.audio || (m._audio && m._audio.nome)]) {
+        const r = await raw('pensieri/' + nome); if (!r.ok) return null;
+        pezzi.push(await r.blob());
+      }
+      blob = new Blob(pezzi, {type: m.mime || pezzi[0].type}); set('audio:' + id, blob);
     }
     blob = await ripara(blob);
     return (urls[id] = URL.createObjectURL(blob));
@@ -569,12 +613,12 @@ window.SP = (() => {
 
   /* ---------- la lista che vede l'app ---------- */
   function pensieri() {
-    const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato}));
+    const out = locali.map(l => ({id: l.id, creato: l.creato, durata: l.durata, stato: l.stato, progresso: l.progresso, nomeFile: l.nome}));
     for (const [id, m] of Object.entries(st.remoti)) {
       if (locali.some(l => l.id === id)) continue;
       const t = st.testi[id];
-      out.push(Object.assign({id, creato: m.creato, durata: m.durata, stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
-        testo: t.testo, titolo: t.titolo, riscritto: t.riscritto, errore: t.errore, secondBrain: t.secondBrain} : {}));
+      out.push(Object.assign({id, creato: m.creato, durata: m.durata, nomeFile: m.nomeFile, stato: t && t.testo != null ? 'pronto' : 'attesa'}, t ? {
+        testo: t.testo, titolo: t.titolo, riscritto: t.riscritto, verbale: t.tipoRiscritto === 'verbale', errore: t.errore, secondBrain: t.secondBrain} : {}));
     }
     return out.sort((a, b) => (b.creato || '').localeCompare(a.creato || ''));
   }
@@ -811,7 +855,8 @@ window.SP_LOCK = (() => {
     const ul = $('#list'), keep = new Map([...ul.children].map(li => [li.dataset.id, li]));
     const frag = document.createDocumentFragment();
     for (const p of ps) {
-      const [stTxt, stIco, busy] = STATI[p.stato] || STATI.attesa;
+      let [stTxt, stIco, busy] = STATI[p.stato] || STATI.attesa;
+      if (p.stato === 'invio' && p.progresso) stTxt = `Invio… parte ${p.progresso}`;
       const html = `<button class="del" type="button" aria-label="Elimina">${ico('trash')}</button>
         <div class="fg"><div class="ic">${ico(p.secondBrain ? 'brain' : stIco)}</div><div class="tx">
         <div class="t">${esc(titolo(p))}</div><div class="d">${esc(quando(p.creato))} · ${mmss(p.durata)}</div>
@@ -886,6 +931,7 @@ window.SP_LOCK = (() => {
     d('title').textContent = titolo(p);
     d('when').textContent = `${quando(p.creato)} · ${mmss(p.durata)}`;
     d('seg').hidden = !p.riscritto;
+    d('seg1').textContent = p.verbale ? 'Verbale' : 'Riscritta';
     d('seg').querySelectorAll('button').forEach(b => b.classList.toggle('on', +b.dataset.t === tab));
     const t = d('text');
     if (p.testo) { t.className = 'text'; t.textContent = tab && p.riscritto ? p.riscritto : p.testo; }
@@ -943,7 +989,7 @@ window.SP_LOCK = (() => {
   player.addEventListener('ended', () => { ferma(); pos = 0; partito = false; fill.style.transform = 'translateX(-100%)'; $('#detail [data-d=time]').textContent = mmss(durata()); syncPlay(); });
 
   /* ---------- registrare ---------- */
-  const MAX_S = 10 * 60; // un pensiero dura al massimo 10 minuti
+  const MAX_S = 2 * 60 * 60; // al massimo due ore (una riunione); poi si chiude da sola
   const MIMES = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus', 'audio/webm'];
   const NBARS = 22;
   $('#bars').innerHTML = '<i></i>'.repeat(NBARS);
@@ -1004,7 +1050,7 @@ window.SP_LOCK = (() => {
     mr.ondataavailable = e => {
       const r = rec; if (!r || !e.data || !e.data.size) return;
       r.chunks.push(e.data);
-      if (!r.discard && r.mr.state === 'recording') SP.bozza({creato: r.creato, mime: r.mr.mimeType, durata: parlato(r)}, r.chunks);
+      if (!r.discard && r.mr.state !== 'inactive') SP.bozza({creato: r.creato, mime: r.mr.mimeType, durata: parlato(r)}, e.data, r.chunks.length);
     };
     mr.onstop = finish;
     await aspetta(suona('avvio'));
@@ -1014,7 +1060,7 @@ window.SP_LOCK = (() => {
     try { rec.lock = await navigator.wakeLock?.request('screen'); } catch (e) {} // schermo acceso mentre parli
     if (navigator.vibrate) navigator.vibrate(12);
     $('#live').classList.remove('pausa'); $('#pausa').innerHTML = ico('pause'); $('#pausa').setAttribute('aria-label', 'Pausa');
-    $('#rec').hidden = true; $('#live').hidden = false;
+    $('#rec').hidden = true; $('#imp').hidden = true; $('#live').hidden = false;
     tick();
   }
   // secondi registrati davvero: le pause non contano
@@ -1047,7 +1093,7 @@ window.SP_LOCK = (() => {
     if (!rec.lastBar || now - rec.lastBar > 60) { rec.lastBar = now; rec.hist.push(lvl); rec.hist.shift(); barEls.forEach((b, i) => { b.style.height = (4 + rec.hist[i] * 22).toFixed(1) + 'px'; }); }
     const el = parlato(rec);
     $('#clock').textContent = mmss(el);
-    if (el >= MAX_S) { toast('Dieci minuti: lo chiudo qui'); return stopRec(); }
+    if (el >= MAX_S) { toast('Due ore: la chiudo qui'); return stopRec(); }
     rec.raf = requestAnimationFrame(tick);
   }
   function stopRec(discard) {
@@ -1059,7 +1105,7 @@ window.SP_LOCK = (() => {
   async function finish() {
     const r = rec; rec = null;
     r.stream.getTracks().forEach(t => t.stop()); r.ctx.close().catch(() => {}); try { r.lock && r.lock.release(); } catch (e) {}
-    $('#live').hidden = true; $('#rec').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
+    $('#live').hidden = true; $('#rec').hidden = false; $('#imp').hidden = false; barEls.forEach(b => { b.style.height = '4px'; });
     await SP.bozzaVia();
     if (r.discard) { suona('annullato'); return toast('Registrazione annullata'); }
     if (r.durata < 1 || !r.chunks.length) { suona('annullato'); return toast('Troppo breve per salvarlo'); }
@@ -1070,6 +1116,24 @@ window.SP_LOCK = (() => {
     toast(navigator.onLine ? 'Salvato · lo mando al Mac' : 'Salvato sul telefono · parte appena c\'è rete');
   }
   $('#rec').addEventListener('click', startRec);
+
+  /* ---------- importare un audio (il registratore del telefono, un vocale) ---------- */
+  // la durata la dice il file stesso; se non la dice, resta 0 e la scrive il Mac
+  const durataFile = f => new Promise(res => {
+    const a = new Audio(), u = URL.createObjectURL(f), fine = v => { URL.revokeObjectURL(u); res(isFinite(v) && v > 0 ? v : 0); };
+    a.preload = 'metadata'; a.onloadedmetadata = () => fine(a.duration); a.onerror = () => fine(0); setTimeout(() => fine(0), 8000); a.src = u;
+  });
+  $('#imp').addEventListener('click', () => { if (!rec) $('#file').click(); });
+  $('#file').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    if (f.type && !/^audio\/|^video\/(mp4|3gpp|webm)|octet-stream/.test(f.type) && !/\.(m4a|mp3|wav|ogg|oga|opus|aac|amr|3gp|webm|flac)$/i.test(f.name)) return toast('Non sembra un file audio');
+    toast('Preparo il file…');
+    const quando = f.lastModified ? new Date(f.lastModified) : new Date();
+    await SP.aggiungi(f, await durataFile(f), f.type, quando.toISOString(), f.name);
+    suona('inviato');
+    toast(navigator.onLine ? (f.size > 4 * 1024 * 1024 ? 'Importato · lo mando al Mac a pezzi' : 'Importato · lo mando al Mac') : 'Importato · parte appena c\'è rete');
+  });
   $('#stop').addEventListener('click', () => stopRec(false));
   $('#pausa').addEventListener('click', pausa);
   $('#annulla').addEventListener('click', () => stopRec(true));
